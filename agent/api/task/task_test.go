@@ -677,7 +677,7 @@ func TestGetDockerResourcesInternalGPUInstance(t *testing.T) {
 	resources := testTask.getDockerResources(testTask.Containers[0], cfg)
 	assert.Equal(t, int64(10), resources.CPUShares, "Wrong number of CPUShares")
 	assert.Equal(t, int64(268435456), resources.Memory, "Wrong amount of memory")
-	assert.Equal(t, int64(len(resources.DeviceRequests)), int64(0), "GPU IDs to be handled by env var for internal instance")
+	assert.Len(t, resources.DeviceRequests, 0)
 }
 
 func TestPostUnmarshalTaskWithDockerVolumes(t *testing.T) {
