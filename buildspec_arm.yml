@@ -1,0 +1,39 @@
+version: 0.2
+
+env:
+  variables:
+    BUILD_LOG: "build_arm.log"
+    GITHUBUSERNAME: prateekchaudhry
+ 
+phases:
+  install:
+    commands:
+       - go version
+       - GOVERSION="1.15.15"
+       - GOLANG_TAR="go${GOVERSION}.linux-arm64.tar.gz"
+       - wget -O /tmp/${GOLANG_TAR} https://storage.googleapis.com/golang/${GOLANG_TAR}
+       - tar -C /usr/local -xzf /tmp/${GOLANG_TAR}
+       - go version
+       - echo "Install glibc-static for dockerfree installation method"
+       - yum -y install glibc-static | tee $BUILD_LOG
+  build:
+    commands:
+      - go version
+      - echo "build_id = $CODEBUILD_LOG_PATH" | tee -a $BUILD_LOG
+      - echo Building agent image | tee -a $BUILD_LOG
+      - AGENT_VERSION=$(cat VERSION)
+      - ECS_AGENT_TAR="ecs-agent-v${AGENT_VERSION}.tar"
+      - echo $(pwd) | tee -a $BUILD_LOG
+      # Path readjustment for codebuild testing with fork due to cni plugins - may not needed when deploying with main(?)
+      - cd ../..
+      - mv $GITHUBUSERNAME aws
+      - cd aws/amazon-ecs-agent
+      - GO111MODULE=auto
+      - make dockerfree-agent-image 2>&1 | tee -a $BUILD_LOG
+  post_build:
+    commands:
+artifacts:
+  files:
+    - $ECS_AGENT_TAR
+    - $BUILD_LOG
+  name: $CODEBUILD_RESOLVED_SOURCE_VERSION
