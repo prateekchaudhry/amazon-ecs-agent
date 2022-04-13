@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 //
@@ -48,7 +49,7 @@ type StatsTask struct {
 	netlinkinterface   netlinkwrapper.NetLink
 }
 
-func newStatsTaskContainer(taskARN string, containerPID string, numberOfContainers int,
+func newStatsTaskContainer(taskARN, taskId, containerPID string, numberOfContainers int,
 	resolver resolver.ContainerMetadataResolver, publishInterval time.Duration, _ task.TaskENIs) (*StatsTask, error) {
 	nsAgent := nswrapper.NewNS()
 	netlinkclient := netlinkwrapper.New()
@@ -58,6 +59,7 @@ func newStatsTaskContainer(taskARN string, containerPID string, numberOfContaine
 		statsTaskCommon: &statsTaskCommon{
 			TaskMetadata: &TaskMetadata{
 				TaskArn:          taskARN,
+				TaskId:           taskId,
 				ContainerPID:     containerPID,
 				NumberContainers: numberOfContainers,
 			},

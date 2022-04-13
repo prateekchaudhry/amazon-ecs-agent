@@ -1,4 +1,5 @@
 //go:build linux && unit
+// +build linux,unit
 
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 //
@@ -85,8 +86,7 @@ func TestResourceContainerProgression(t *testing.T) {
 
 	mockControl := mock_control.NewMockControl(ctrl)
 	mockIO := mock_ioutilwrapper.NewMockIOUtil(ctrl)
-	taskID, err := sleepTask.GetID()
-	assert.NoError(t, err)
+	taskID := sleepTask.GetID()
 	cgroupMemoryPath := fmt.Sprintf("/sys/fs/cgroup/memory/ecs/%s/memory.use_hierarchy", taskID)
 	cgroupRoot := fmt.Sprintf("/ecs/%s", taskID)
 	cgroupResource := cgroup.NewCgroupResource(sleepTask.Arn, mockControl, mockIO, cgroupRoot, cgroupMountPath, specs.LinuxResources{})
@@ -94,6 +94,7 @@ func TestResourceContainerProgression(t *testing.T) {
 	sleepTask.ResourcesMapUnsafe = make(map[string][]taskresource.TaskResource)
 	sleepTask.AddResource("cgroup", cgroupResource)
 	eventStream := make(chan dockerapi.DockerContainerChangeEvent)
+
 	// containerEventsWG is used to force the test to wait until the container created and started
 	// events are processed
 	containerEventsWG := sync.WaitGroup{}
@@ -127,7 +128,6 @@ func TestResourceContainerProgression(t *testing.T) {
 				}()
 			}).Return(dockerapi.DockerContainerMetadata{DockerID: containerID + ":" + sleepContainer.Name}),
 	)
-
 	addTaskToEngine(t, ctx, taskEngine, sleepTask, mockTime, &containerEventsWG)
 
 	cleanup := make(chan time.Time, 1)
@@ -253,8 +253,7 @@ func TestResourceContainerProgressionFailure(t *testing.T) {
 	sleepContainer.BuildResourceDependency("cgroup", resourcestatus.ResourceCreated, apicontainerstatus.ContainerPulled)
 
 	mockControl := mock_control.NewMockControl(ctrl)
-	taskID, err := sleepTask.GetID()
-	assert.NoError(t, err)
+	taskID := sleepTask.GetID()
 	cgroupRoot := fmt.Sprintf("/ecs/%s", taskID)
 	cgroupResource := cgroup.NewCgroupResource(sleepTask.Arn, mockControl, nil, cgroupRoot, cgroupMountPath, specs.LinuxResources{})
 
@@ -269,7 +268,7 @@ func TestResourceContainerProgressionFailure(t *testing.T) {
 	)
 	mockTime.EXPECT().Now().Return(time.Now()).AnyTimes()
 
-	err = taskEngine.Init(ctx)
+	err := taskEngine.Init(ctx)
 	assert.NoError(t, err)
 
 	taskEngine.AddTask(sleepTask)
@@ -330,8 +329,7 @@ func TestTaskCPULimitHappyPath(t *testing.T) {
 			}()
 			mockControl := mock_control.NewMockControl(ctrl)
 			mockIO := mock_ioutilwrapper.NewMockIOUtil(ctrl)
-			taskID, err := sleepTask.GetID()
-			assert.NoError(t, err)
+			taskID := sleepTask.GetID()
 			cgroupMemoryPath := fmt.Sprintf("/sys/fs/cgroup/memory/ecs/%s/memory.use_hierarchy", taskID)
 			if tc.taskCPULimit.Enabled() {
 				// TODO Currently, the resource Setup() method gets invoked multiple

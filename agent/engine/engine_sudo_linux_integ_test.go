@@ -1,4 +1,5 @@
 //go:build linux && sudo
+// +build linux,sudo
 
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 //
@@ -247,7 +248,7 @@ func TestFirelensFluentbit(t *testing.T) {
 	err = VerifyTaskStatus(apitaskstatus.TaskStopped, testTask.Arn, testEvents, t)
 	assert.NoError(t, err)
 
-	taskID, err := testTask.GetID()
+	taskID := testTask.GetID()
 
 	//declare a cloudwatch client
 	cwlClient := cloudwatchlogs.New(session.New(), aws.NewConfig().WithRegion(testECSRegion))

@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 // Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 //
@@ -19,6 +20,9 @@ import (
 	"context"
 	"strings"
 	"time"
+
+	"github.com/aws/amazon-ecs-agent/agent/logger"
+	"github.com/aws/amazon-ecs-agent/agent/logger/field"
 
 	log "github.com/cihub/seelog"
 	"github.com/deniswernert/udev"
@@ -109,7 +113,9 @@ func (eniWatcher *ENIWatcher) reconcileOnce(withRetry bool) error {
 		if withRetry {
 			go func(ctx context.Context, macAddress string, timeout time.Duration) {
 				if err := eniWatcher.sendENIStateChangeWithRetries(ctx, macAddress, timeout); err != nil {
-					log.Infof("ENI watcher event-handler: unable to send state change: %v", err)
+					logger.Error("Unable to send state ENI change", logger.Fields{
+						field.Error: err,
+					})
 				}
 			}(eniWatcher.ctx, mac, sendENIStateChangeRetryTimeout)
 			continue
@@ -119,9 +125,13 @@ func (eniWatcher *ENIWatcher) reconcileOnce(withRetry bool) error {
 			if strings.Contains(err.Error(), eniStatusSentMsg) {
 				continue
 			} else if _, ok := err.(*unmanagedENIError); ok {
-				log.Debugf("ENI watcher reconciliation: unable to send state change: %v", err)
+				logger.Debug("Unable to send state ENI change", logger.Fields{
+					field.Error: err,
+				})
 			} else {
-				log.Warnf("ENI watcher reconciliation: unable to send state change: %v", err)
+				logger.Warn("Unable to send state ENI change", logger.Fields{
+					field.Error: err,
+				})
 			}
 		}
 	}
