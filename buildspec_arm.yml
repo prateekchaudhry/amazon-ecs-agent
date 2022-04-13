@@ -9,6 +9,7 @@ phases:
   install:
     commands:
        - go version
+       - uname -m
        - GOVERSION="1.15.15"
        - GOLANG_TAR="go${GOVERSION}.linux-arm64.tar.gz"
        - wget -O /tmp/${GOLANG_TAR} https://storage.googleapis.com/golang/${GOLANG_TAR}
@@ -30,6 +31,7 @@ phases:
       - cd aws/amazon-ecs-agent
       - GO111MODULE=auto
       - make dockerfree-agent-image 2>&1 | tee -a $BUILD_LOG
+      # Will the arm artifacts have same name as amd artifacts?
   post_build:
     commands:
 artifacts:
