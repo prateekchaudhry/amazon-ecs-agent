@@ -2,21 +2,29 @@ version: 0.2
 
 env:
   variables:
-    BUILD_LOG: "build_arm.log"
     GITHUBUSERNAME: prateekchaudhry
  
 phases:
   install:
     commands:
        - go version
-       - uname -m
+       - architecture=""
+       - case $(uname -m) in
+           x86_64)
+             architecture="amd64"
+           ;;
+           aarch64)
+             architecture="arm64"
+           ;;
+         esac
        - GOVERSION="1.15.15"
-       - GOLANG_TAR="go${GOVERSION}.linux-arm64.tar.gz"
-       - wget -O /tmp/${GOLANG_TAR} https://storage.googleapis.com/golang/${GOLANG_TAR}
-       - tar -C /usr/local -xzf /tmp/${GOLANG_TAR}
+       - BUILD_LOG="build_${architecture}.log"
+       - GOLANG_TAR="go${GOVERSION}.linux-${architecture}.tar.gz"
+       - wget -O /tmp/${GOLANG_TAR} https://storage.googleapis.com/golang/${GOLANG_TAR} | tee $BUILD_LOG
+       - tar -C /usr/local -xzf /tmp/${GOLANG_TAR} | tee -a $BUILD_LOG
        - go version
-       - echo "Install glibc-static for dockerfree installation method"
-       - yum -y install glibc-static | tee $BUILD_LOG
+       - echo "Install glibc-static for dockerfree installation method" | tee -a $BUILD_LOG
+       - yum -y install glibc-static | tee -a $BUILD_LOG
   build:
     commands:
       - go version
@@ -31,6 +39,12 @@ phases:
       - cd aws/amazon-ecs-agent
       - GO111MODULE=auto
       - make dockerfree-agent-image 2>&1 | tee -a $BUILD_LOG
+      # Rename arm artifact
+      - if [[ $architecture == "arm64" ]]
+        then
+          mv $ECS_AGENT_TAR "ecs-agent-arm64-v${AGENT_VERSION}.tar"
+          ECS_AGENT_TAR="ecs-agent-arm64-v${AGENT_VERSION}.tar"
+        fi
       # Will the arm artifacts have same name as amd artifacts?
   post_build:
     commands:
