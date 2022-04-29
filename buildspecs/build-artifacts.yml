@@ -21,7 +21,7 @@ phases:
          esac
 
        # Tested with GOVERSION 1.15.x and 1.17.x
-       - GOVERSION="1.15.15"
+       - GOVERSION="$(cat GO_VERSION)"
        - BUILD_LOG="build_${architecture}.log"
        - GOLANG_TAR="go${GOVERSION}.linux-${architecture}.tar.gz"
 
