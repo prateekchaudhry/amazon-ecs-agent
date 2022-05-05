@@ -23,6 +23,7 @@ phases:
        - echo $GOPATH
        - echo $GOBIN
        - which go
+       - goenv install --list
        - GOVERSION="$(cat GO_VERSION)"
        - BUILD_LOG="build_${architecture}.log"
        - GOLANG_TAR="go${GOVERSION}.linux-${architecture}.tar.gz"
