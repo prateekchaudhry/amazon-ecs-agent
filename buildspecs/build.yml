@@ -25,7 +25,7 @@ phases:
 
        # Need to install GOLANG explicitly as required versions do not come preinstalled
        - wget -O /tmp/${GOLANG_TAR} https://storage.googleapis.com/golang/${GOLANG_TAR} 2>&1 | tee $BUILD_LOG
-       - tar -C /usr/local -xzf /tmp/${GOLANG_TAR} 2>&1 | tee -a $BUILD_LOG
+       - rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/${GOLANG_TAR} 2>&1 | tee -a $BUILD_LOG
        - go version
 
        # glibc-static required for dockerfree make method
