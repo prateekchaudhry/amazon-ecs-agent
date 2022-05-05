@@ -25,6 +25,7 @@ phases:
        - which go
        - goenv install --list
        - GOVERSION="$(cat GO_VERSION)"
+       - GOVERSION="1.15.5"
        - BUILD_LOG="build_${architecture}.log"
 
        # Install the correct version of GoLang using goenv utility (preinstalled in CodeBuild images)
