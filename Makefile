@@ -374,7 +374,7 @@ amazon-linux-sources.tgz:
 
 amazon-linux-rpm-integrated: .amazon-linux-rpm-integrated-done
 
-.generic-rpm-integrated-done:
+.generic-rpm-integrated-done: get-cni-sources
 	./scripts/update-version.sh
 	cp packaging/generic-rpm-integrated/amazon-ecs-init.spec amazon-ecs-init.spec
 	cp packaging/generic-rpm-integrated/ecs.service ecs.service
