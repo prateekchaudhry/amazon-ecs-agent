@@ -21,7 +21,7 @@ clean:
 	rm -f amazon-ecs-init
 
 override_dh_auto_install:
-	cp ./ecs-agent-v${AGENT_VERSION}.tar debian/amazon-ecs-init/var/cache/ecs/ecs-agent-v${VERSION}.tar
+	cp ./ecs-agent-v$(VERSION:-1=).tar debian/amazon-ecs-init/var/cache/ecs/ecs-agent-v${VERSION}.tar
 	echo "2" >debian/amazon-ecs-init/var/cache/ecs/state
 	ln -s "/var/cache/ecs/ecs-agent-v${VERSION}.tar" debian/amazon-ecs-init/var/cache/ecs/ecs-agent.tar
 	dh_installsystemd --no-start --no-enable --name=ecs
