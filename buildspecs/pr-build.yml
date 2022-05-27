@@ -62,11 +62,9 @@ phases:
       - ls
       # Rename artifacts for architecture
       - |
-        if [[ $architecture == "amd64" ]] ; then
-          ECS_AGENT_RPM="amazon-ecs-init-${AGENT_VERSION}-1.x86_64.rpm"
-        else
+        if [[ $architecture == "arm64" ]] ; then
           mv $ECS_AGENT_TAR "ecs-agent-arm64-v${AGENT_VERSION}.tar"
-          ECS_AGENT_RPM="amazon-ecs-init-${AGENT_VERSION}-1.arm64.rpm"
+          ECS_AGENT_RPM="amazon-ecs-init-${AGENT_VERSION}-1.aarch64.rpm"
           ECS_AGENT_TAR="ecs-agent-arm64-v${AGENT_VERSION}.tar"
         fi
 
