@@ -26,7 +26,7 @@ phases:
   build:
     commands:
       - echo "build_id = $CODEBUILD_LOG_PATH" 2>&1 | tee -a $BUILD_LOG
-      - echo Building agent image 2>&1 | tee -a $BUILD_LOG
+      - echo "Building agent deb" 2>&1 | tee -a $BUILD_LOG
       - AGENT_VERSION=$(cat VERSION)
       - ECS_AGENT_DEB="amazon-ecs-init_${AGENT_VERSION}-1_${architecture}.deb"
       - ECS_AGENT_DEB_TAR="amazon-ecs-init_${AGENT_VERSION}-1.debian.tar.xz"
