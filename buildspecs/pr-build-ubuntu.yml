@@ -41,12 +41,12 @@ phases:
 
       # Building agent deb
       - GO111MODULE=auto
-      - sudo apt-get update -y | tee -a $BUILD_LOG
-      - sudo apt install -y make | tee -a $BUILD_LOG
-      - sudo apt install -y dpkg-dev | tee -a $BUILD_LOG
-      - sudo apt install -y devscripts | tee -a $BUILD_LOG
-      - sudo apt install -y debhelper | tee -a $BUILD_LOG
-      - sudo apt install -y golang | tee -a $BUILD_LOG
+      - apt-get update -y | tee -a $BUILD_LOG
+      - apt install -y make | tee -a $BUILD_LOG
+      - apt install -y dpkg-dev | tee -a $BUILD_LOG
+      - apt install -y devscripts | tee -a $BUILD_LOG
+      - apt install -y debhelper | tee -a $BUILD_LOG
+      - apt install -y golang | tee -a $BUILD_LOG
       - which go
       - go version
       - make generic-deb-integrated 2>&1 | tee -a $BUILD_LOG
