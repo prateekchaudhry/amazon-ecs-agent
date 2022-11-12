@@ -71,6 +71,12 @@ phases:
 
       # Build agent tar and rpm
       - GO111MODULE=auto
+
+      # Update version.go file
+      - ./scripts/update-version.sh
+      - git add agent/version/version.go
+      - git commit -m "update version"
+
       - make dockerfree-agent-image
       - make generic-rpm-integrated
       - ls
