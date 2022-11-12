@@ -259,6 +259,7 @@ dockerfree-cni-plugins: get-cni-sources
 
 # see dockerfree-pause above: assumes that the pre-compiled pause container tar exists
 dockerfree-agent-image: dockerfree-certs dockerfree-cni-plugins static-with-pause
+	./scripts/update-version.sh
 	./scripts/build-agent-image
 
 .PHONY: codebuild
