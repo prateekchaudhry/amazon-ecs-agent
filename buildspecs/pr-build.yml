@@ -60,6 +60,12 @@ phases:
 
       # Building agent tars
       - GO111MODULE=auto
+
+      # Update version.go file
+      - ./scripts/update-version.sh | tee -a $BUILD_LOG
+      - git add agent/version/version.go | tee -a $BUILD_LOG
+      - git commit -m "update version" | tee -a $BUILD_LOG
+
       - make dockerfree-agent-image 2>&1 | tee -a $BUILD_LOG
       - make generic-rpm-integrated 2>&1 | tee -a $BUILD_LOG
       - ls
