@@ -92,6 +92,9 @@ ln -sf %{basename:%{agent_image}} %{_cachedir}/ecs/ecs-agent.tar
 %systemd_postun_with_restart amazon-ecs-volume-plugin
 
 %changelog
+* Fri Jan 13 2023 Prateek Chaudhry <ptchau@amazon.com> - 1.68.1-1
+- Cache Agent version 1.68.1
+
 * Mon Jan 09 2023 Ray Allan <fierlion@amazon.com> - 1.68.0-1
 - Cache Agent version 1.68.0
 

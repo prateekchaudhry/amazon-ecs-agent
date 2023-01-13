@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.68.1
+* bongo_blob
+
 ## 1.68.0
 * Bug - Add ServiceConnect image to clean-up exclusion list [#3521](https://github.com/aws/amazon-ecs-agent/pull/3521)
 * Enhancement: added new agent configuration to specify ephemeral host port range [#3522](https://github.com/aws/amazon-ecs-agent/pull/3522)
