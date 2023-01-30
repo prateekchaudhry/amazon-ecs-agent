@@ -94,7 +94,7 @@ func TestRetrieveServiceConnectMetrics(t *testing.T) {
 		{
 			stats: `# TYPE MetricFamily3 histogram
 				MetricFamily3{DimensionX="value1", DimensionY="value2", Direction="egress", le="0.5"} 1
-				MetricFamily3{DimensionX="value1", DimensionY="value2", Direction="egress", le="1"} 2
+				MetricFamily3{DimensionX="value1", DimensionY="value2", Direction="egress", le="1"} 1
 				MetricFamily3{DimensionX="value1", DimensionY="value2", Direction="egress", le="5"} 3
 				`,
 			expectedStats: []*ecstcs.GeneralMetricsWrapper{
@@ -110,42 +110,52 @@ func TestRetrieveServiceConnectMetrics(t *testing.T) {
 						}},
 					GeneralMetrics: []*ecstcs.GeneralMetric{
 						{
-							MetricCounts: []*int64{aws.Int64(1), aws.Int64(1), aws.Int64(1)},
+							MetricCounts: []*int64{aws.Int64(1), aws.Int64(2)},
 							MetricName:   aws.String("MetricFamily3"),
-							MetricValues: []*float64{aws.Float64(0.5), aws.Float64(1), aws.Float64(5)},
+							MetricValues: []*float64{aws.Float64(0.5), aws.Float64(5)},
 						},
 					},
 				},
 			},
 		},
+		{
+			stats: `# TYPE MetricFamily3 histogram
+				MetricFamily3{DimensionX="value1", DimensionY="value2", Direction="egress", le="0.5"} 0
+				MetricFamily3{DimensionX="value1", DimensionY="value2", Direction="egress", le="1"} 0
+				MetricFamily3{DimensionX="value1", DimensionY="value2", Direction="egress", le="5"} 0
+				`,
+			expectedStats: []*ecstcs.GeneralMetricsWrapper{},
+		},
 	}
 
 	for _, test := range tests {
-		// Set up a mock http sever on the statsUrlpath
-		mockUDSPath := "/tmp/appnet_admin.sock"
-		r := mux.NewRouter()
-		r.HandleFunc("/get/them/stats", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, "%v", test.stats)
-		}))
+		func() {
+			// Set up a mock http sever on the statsUrlpath
+			mockUDSPath := "/tmp/appnet_admin.sock"
+			r := mux.NewRouter()
+			r.HandleFunc("/get/them/stats", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprintf(w, "%v", test.stats)
+			}))
 
-		ts := httptest.NewUnstartedServer(r)
+			ts := httptest.NewUnstartedServer(r)
+			defer ts.Close()
 
-		l, err := net.Listen("unix", mockUDSPath)
-		assert.NoError(t, err)
+			l, err := net.Listen("unix", mockUDSPath)
+			assert.NoError(t, err)
 
-		ts.Listener.Close()
-		ts.Listener = l
-		ts.Start()
+			ts.Listener.Close()
+			ts.Listener = l
+			ts.Start()
 
-		serviceConnectStats := &ServiceConnectStats{
-			appnetClient: appnet.Client(),
-		}
-		serviceConnectStats.retrieveServiceConnectStats(t1)
+			serviceConnectStats := &ServiceConnectStats{
+				appnetClient: appnet.Client(),
+			}
+			serviceConnectStats.retrieveServiceConnectStats(t1)
 
-		sortMetrics(serviceConnectStats.GetStats())
-		sortMetrics(test.expectedStats)
-		assert.Equal(t, test.expectedStats, serviceConnectStats.GetStats())
-		ts.Close()
+			sortMetrics(serviceConnectStats.GetStats())
+			sortMetrics(test.expectedStats)
+			assert.Equal(t, test.expectedStats, serviceConnectStats.GetStats())
+		}()
 	}
 }
 
