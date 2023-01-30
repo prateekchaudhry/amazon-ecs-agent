@@ -254,6 +254,7 @@ dockerfree-cni-plugins:
 # see dockerfree-pause above: assumes that the pre-compiled pause container tar exists
 # builds agent image and saves on disk, assumes cni plugins have been pulled
 release-agent-internal: dockerfree-certs dockerfree-cni-plugins static
+
 	./scripts/build-agent-image
 
 # Default Agent target to build. Pulls cni plugins, builds agent image and save it to disk 
