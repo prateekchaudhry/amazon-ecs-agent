@@ -31,14 +31,14 @@ import (
 func NewTaskEngine(cfg *config.Config, client dockerapi.DockerClient,
 	credentialsManager credentials.Manager,
 	containerChangeEventStream *eventstream.EventStream,
-	imageManager ImageManager, state dockerstate.TaskEngineState,
+	imageManager ImageManager, hostResourceManager HostResourceManager, state dockerstate.TaskEngineState,
 	metadataManager containermetadata.Manager,
 	resourceFields *taskresource.ResourceFields,
 	execCmdMgr execcmd.Manager,
 	serviceConnectManager serviceconnect.Manager) TaskEngine {
 
 	taskEngine := NewDockerTaskEngine(cfg, client, credentialsManager,
-		containerChangeEventStream, imageManager,
+		containerChangeEventStream, imageManager, hostResourceManager,
 		state, metadataManager, resourceFields, execCmdMgr, serviceConnectManager)
 
 	return taskEngine

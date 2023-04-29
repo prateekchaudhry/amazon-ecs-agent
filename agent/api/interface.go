@@ -58,6 +58,7 @@ type ECSClient interface {
 	// UpdateContainerInstancesState updates the given container Instance ID with
 	// the given status. Only valid statuses are ACTIVE and DRAINING.
 	UpdateContainerInstancesState(instanceARN, status string) error
+	GetResources() ([]*ecs.Resource, error)
 }
 
 // ECSSDK is an interface that specifies the subset of the AWS Go SDK's ECS

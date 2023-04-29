@@ -185,7 +185,7 @@ func (client *APIECSClient) registerContainerInstance(clusterRef string, contain
 	registerRequest.PlatformDevices = platformDevices
 	registerRequest = client.setInstanceIdentity(registerRequest)
 
-	resources, err := client.getResources()
+	resources, err := client.GetResources()
 	if err != nil {
 		return "", "", err
 	}
@@ -269,7 +269,7 @@ func findMissingAttributes(expectedAttributes, actualAttributes map[string]strin
 	return missingAttributes, err
 }
 
-func (client *APIECSClient) getResources() ([]*ecs.Resource, error) {
+func (client *APIECSClient) GetResources() ([]*ecs.Resource, error) {
 	// Micro-optimization, the pointer to this is used multiple times below
 	integerStr := "INTEGER"
 
