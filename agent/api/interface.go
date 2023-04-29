@@ -58,6 +58,7 @@ type ECSClient interface {
 	// UpdateContainerInstancesState updates the given container Instance ID with
 	// the given status. Only valid statuses are ACTIVE and DRAINING.
 	UpdateContainerInstancesState(instanceARN, status string) error
+	// GetResources returns CPU, Memory and Reserved Ports resources
 	GetResources() ([]*ecs.Resource, error)
 }
 
