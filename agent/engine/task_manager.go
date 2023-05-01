@@ -42,7 +42,6 @@ import (
 	"github.com/aws/amazon-ecs-agent/agent/taskresource"
 	resourcestatus "github.com/aws/amazon-ecs-agent/agent/taskresource/status"
 	"github.com/aws/amazon-ecs-agent/agent/utils/retry"
-	utilsync "github.com/aws/amazon-ecs-agent/agent/utils/sync"
 	"github.com/aws/amazon-ecs-agent/agent/utils/ttime"
 )
 
@@ -135,7 +134,6 @@ type managedTask struct {
 	credentialsManager credentials.Manager
 	cniClient          ecscni.CNIClient
 	dockerClient       dockerapi.DockerClient
-	taskStopWG         *utilsync.SequentialWaitGroup
 
 	acsMessages                chan acsTransition
 	dockerMessages             chan dockerContainerChange
@@ -184,7 +182,6 @@ func (engine *DockerTaskEngine) newManagedTask(task *apitask.Task) *managedTask 
 		credentialsManager:            engine.credentialsManager,
 		cniClient:                     engine.cniClient,
 		dockerClient:                  engine.client,
-		taskStopWG:                    engine.taskStopGroup,
 		steadyStatePollInterval:       engine.taskSteadyStatePollInterval,
 		steadyStatePollIntervalJitter: engine.taskSteadyStatePollIntervalJitter,
 	}
@@ -243,13 +240,6 @@ func (mtask *managedTask) overseeTask() {
 	mtask.engine.checkTearDownPauseContainer(mtask.Task)
 	// TODO [SC]: We need to also tear down pause containets in bridge mode for SC-enabled tasks
 	mtask.cleanupCredentials()
-	if mtask.StopSequenceNumber != 0 {
-		logger.Debug("Marking done for this sequence", logger.Fields{
-			field.TaskID:   mtask.GetID(),
-			field.Sequence: mtask.StopSequenceNumber,
-		})
-		mtask.taskStopWG.Done(mtask.StopSequenceNumber)
-	}
 	// TODO: make this idempotent on agent restart
 	go mtask.releaseIPInIPAM()
 	mtask.cleanupTask(retry.AddJitter(mtask.cfg.TaskCleanupWaitDuration, mtask.cfg.TaskCleanupWaitDurationJitter))
@@ -278,27 +268,13 @@ func (mtask *managedTask) emitCurrentStatus() {
 // the task. This involves waiting for previous stops to complete so the
 // resources become free.
 func (mtask *managedTask) waitForHostResources() {
-	if mtask.StartSequenceNumber == 0 {
-		// This is the first transition on this host. No need to wait
-		return
-	}
 	if mtask.GetDesiredStatus().Terminal() {
 		// Task's desired status is STOPPED. No need to wait in this case either
 		return
 	}
 
-	logger.Info("Waiting for any previous stops to complete", logger.Fields{
-		field.TaskID:   mtask.GetID(),
-		field.Sequence: mtask.StartSequenceNumber,
-	})
-
 	othersStoppedCtx, cancel := context.WithCancel(mtask.ctx)
 	defer cancel()
-
-	go func() {
-		mtask.taskStopWG.Wait(mtask.StartSequenceNumber)
-		cancel()
-	}()
 
 	for !mtask.waitEvent(othersStoppedCtx.Done()) {
 		if mtask.GetDesiredStatus().Terminal() {
@@ -406,26 +382,26 @@ func (mtask *managedTask) handleDesiredStatusChange(desiredStatus apitaskstatus.
 		field.TaskID:        mtask.GetID(),
 		field.DesiredStatus: desiredStatus.String(),
 		field.Sequence:      seqnum,
-		"StopNumber":        mtask.StopSequenceNumber,
 	})
 	if desiredStatus <= mtask.GetDesiredStatus() {
 		logger.Debug("Redundant task transition; ignoring", logger.Fields{
 			field.TaskID:        mtask.GetID(),
 			field.DesiredStatus: desiredStatus.String(),
 			field.Sequence:      seqnum,
-			"StopNumber":        mtask.StopSequenceNumber,
 		})
 		return
 	}
-	if desiredStatus == apitaskstatus.TaskStopped && seqnum != 0 && mtask.GetStopSequenceNumber() == 0 {
-		logger.Info("Managed task moving to stopped, adding to stopgroup with sequence number",
-			logger.Fields{
-				field.TaskID:   mtask.GetID(),
-				field.Sequence: seqnum,
-			})
-		mtask.SetStopSequenceNumber(seqnum)
-		mtask.taskStopWG.Add(seqnum, 1)
-	}
+
+	// TODO: Removing this logic assuming no serialization is to be obeyed, revisit and remove this comment
+	// if desiredStatus == apitaskstatus.TaskStopped && seqnum != 0 && mtask.GetStopSequenceNumber() == 0 {
+	// 	logger.Info("Managed task moving to stopped, adding to stopgroup with sequence number",
+	// 		logger.Fields{
+	// 			field.TaskID:   mtask.GetID(),
+	// 			field.Sequence: seqnum,
+	// 		})
+	// 	mtask.SetStopSequenceNumber(seqnum)
+	// 	mtask.taskStopWG.Add(seqnum, 1)
+	// }
 	mtask.SetDesiredStatus(desiredStatus)
 	mtask.UpdateDesiredStatus()
 	mtask.engine.saveTaskData(mtask.Task)

@@ -53,7 +53,6 @@ import (
 	"github.com/aws/amazon-ecs-agent/agent/taskresource/firelens"
 	"github.com/aws/amazon-ecs-agent/agent/utils"
 	"github.com/aws/amazon-ecs-agent/agent/utils/retry"
-	utilsync "github.com/aws/amazon-ecs-agent/agent/utils/sync"
 	"github.com/aws/amazon-ecs-agent/agent/utils/ttime"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/docker/docker/api/types"
@@ -135,8 +134,6 @@ type DockerTaskEngine struct {
 	state        dockerstate.TaskEngineState
 	managedTasks map[string]*managedTask
 
-	taskStopGroup *utilsync.SequentialWaitGroup
-
 	events            <-chan dockerapi.DockerContainerChangeEvent
 	stateChangeEvents chan statechange.Event
 
@@ -209,7 +206,6 @@ func NewDockerTaskEngine(cfg *config.Config,
 
 		state:             state,
 		managedTasks:      make(map[string]*managedTask),
-		taskStopGroup:     utilsync.NewSequentialWaitGroup(),
 		stateChangeEvents: make(chan statechange.Event),
 
 		credentialsManager: credentialsManager,
@@ -493,11 +489,6 @@ func (engine *DockerTaskEngine) filterTasksToStartUnsafe(tasks []*apitask.Task) 
 		}
 
 		tasksToStart = append(tasksToStart, task)
-
-		// Put tasks that are stopped by acs but hasn't been stopped in wait group
-		if task.GetDesiredStatus().Terminal() && task.GetStopSequenceNumber() != 0 {
-			engine.taskStopGroup.Add(task.GetStopSequenceNumber(), 1)
-		}
 	}
 
 	return tasksToStart
@@ -2124,16 +2115,13 @@ func (engine *DockerTaskEngine) updateTaskUnsafe(task *apitask.Task, update *api
 	logger.Debug("Putting update on the acs channel", logger.Fields{
 		field.TaskID:        task.GetID(),
 		field.DesiredStatus: updateDesiredStatus.String(),
-		field.Sequence:      update.StopSequenceNumber,
 	})
 	managedTask.emitACSTransition(acsTransition{
 		desiredStatus: updateDesiredStatus,
-		seqnum:        update.StopSequenceNumber,
 	})
 	logger.Debug("Update taken off the acs channel", logger.Fields{
 		field.TaskID:        task.GetID(),
 		field.DesiredStatus: updateDesiredStatus.String(),
-		field.Sequence:      update.StopSequenceNumber,
 	})
 }
 
