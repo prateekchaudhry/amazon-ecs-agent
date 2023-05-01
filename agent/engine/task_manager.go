@@ -22,9 +22,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/amazon-ecs-agent/agent/ecs_client/model/ecs"
 	"github.com/aws/amazon-ecs-agent/agent/engine/execcmd"
+	"github.com/aws/amazon-ecs-agent/agent/utils"
 
 	"github.com/aws/amazon-ecs-agent/agent/api"
+	"github.com/aws/amazon-ecs-agent/agent/api/container"
 	apicontainer "github.com/aws/amazon-ecs-agent/agent/api/container"
 	apicontainerstatus "github.com/aws/amazon-ecs-agent/agent/api/container/status"
 	apierrors "github.com/aws/amazon-ecs-agent/agent/api/errors"
@@ -201,6 +204,13 @@ func (mtask *managedTask) overseeTask() {
 	mtask.emitCurrentStatus()
 
 	// Wait for host resources required by this task to become available
+	logger.Debug("Starting wait for host resources for task with CPU/MEM resources", logger.Fields{
+		"task_cpu":       mtask.CPU,
+		"task_mem":       mtask.Memory,
+		"container_cpu":  mtask.Containers[0].CPU,
+		"container_mem":  mtask.Containers[0].Memory,
+		"container_port": mtask.Containers[0].Ports,
+	})
 	mtask.waitForHostResources()
 
 	// Main infinite loop. This is where we receive messages and dispatch work.
@@ -268,26 +278,144 @@ func (mtask *managedTask) emitCurrentStatus() {
 // the task. This involves waiting for previous stops to complete so the
 // resources become free.
 func (mtask *managedTask) waitForHostResources() {
-	if mtask.GetDesiredStatus().Terminal() {
-		// Task's desired status is STOPPED. No need to wait in this case either
+	consumed, err := mtask.tryConsumeResources()
+	if err != nil {
+		logger.Error("Error consuming resources due to invalid task config")
+		mtask.SetDesiredStatus(apitaskstatus.TaskStopped)
 		return
 	}
 
-	othersStoppedCtx, cancel := context.WithCancel(mtask.ctx)
-	defer cancel()
+	// task failed to consume resources, we need to wait till we are actually able to consume
+	if !consumed {
+		// create a new context to wait for a pending task to stop
+		othersStoppedCtx, stoppedCtxCancel := context.WithCancel(mtask.ctx)
+		defer stoppedCtxCancel()
 
-	for !mtask.waitEvent(othersStoppedCtx.Done()) {
-		if mtask.GetDesiredStatus().Terminal() {
-			// If we end up here, that means we received a start then stop for this
-			// task before a task that was expected to stop before it could
-			// actually stop
-			break
+		for !mtask.waitEvent(othersStoppedCtx.Done()) {
+			// if we are here that means a task has stopped
+			if mtask.GetDesiredStatus().Terminal() {
+				// If we end up here, that means we received a start then stop for this
+				// task before a task that was expected to stop before it could
+				// actually stop, no need to consume resources here
+				break
+			}
+
+			consumed, err = mtask.tryConsumeResources()
+			if consumed {
+				// Resources consumed, no need to wait
+				break
+			}
+
 		}
 	}
-	logger.Info("Wait over; ready to move towards desired status", logger.Fields{
-		field.TaskID:        mtask.GetID(),
-		field.DesiredStatus: mtask.GetDesiredStatus().String(),
-	})
+}
+
+func (mtask *managedTask) tryConsumeResources() (bool, error) {
+	// toHostResources maps task to []ecs.Resource
+	resources := mtask.toHostResources()
+	// Do not account for internal tasks
+	if mtask.IsInternal {
+		return true, nil
+	}
+	return mtask.engine.hostResourceManager.consume(mtask.Arn, resources)
+}
+
+func (mtask *managedTask) toHostResources() map[string]ecs.Resource {
+	// Following this for current implementation
+	// * For CPU
+	//     * if task level CPU is set, use that
+	//     * else add up container cpus
+	// * For memory
+	//     * if task level memory is set, use that
+	//     * else add up container level -
+	//         * memoryReservation if set,
+	//         * otherwise use memory
+	resources := make(map[string]ecs.Resource)
+	// CPU
+	if mtask.CPU > 0 {
+		taskCPUint64 := int64(mtask.CPU * 1024)
+		resources["CPU"] = ecs.Resource{
+			Name:         utils.Strptr("CPU"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &taskCPUint64,
+		}
+	} else {
+		containerCPUint64 := int64(0)
+		for _, container := range mtask.Containers {
+			containerCPUint64 += int64(container.CPU)
+		}
+		resources["CPU"] = ecs.Resource{
+			Name:         utils.Strptr("CPU"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &containerCPUint64,
+		}
+	}
+
+	// Memory
+	if mtask.Memory > 0 {
+		taskMEMint64 := int64(mtask.Memory)
+		resources["MEMORY"] = ecs.Resource{
+			Name:         utils.Strptr("MEMORY"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &taskMEMint64,
+		}
+	} else {
+		containerMEMint64 := int64(0)
+		for _, container := range mtask.Containers {
+			containerMEMint64 += int64(container.Memory)
+		}
+		resources["MEMORY"] = ecs.Resource{
+			Name:         utils.Strptr("MEMORY"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &containerMEMint64,
+		}
+	}
+	// PORTS
+	var tcpPortSet []uint16
+	for _, c := range mtask.Containers {
+		for _, port := range c.Ports {
+			hostPort := port.HostPort
+			protocol := port.Protocol
+			if protocol == container.TransportProtocolTCP {
+				tcpPortSet = append(tcpPortSet, hostPort)
+			}
+		}
+	}
+	resources["PORTS"] = ecs.Resource{
+		Name:           utils.Strptr("PORTS"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: utils.Uint16SliceToStringSlice(tcpPortSet),
+	}
+
+	// PORTS_UDP
+	var udpPortSet []uint16
+	for _, c := range mtask.Containers {
+		for _, port := range c.Ports {
+			hostPort := port.HostPort
+			protocol := port.Protocol
+			if protocol == container.TransportProtocolUDP {
+				udpPortSet = append(udpPortSet, hostPort)
+			}
+		}
+	}
+	resources["PORTS_UDP"] = ecs.Resource{
+		Name:           utils.Strptr("PORTS"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: utils.Uint16SliceToStringSlice(udpPortSet),
+	}
+
+	// GPU
+	var num_gpus *int64
+	*num_gpus = 0
+	for _, c := range mtask.Containers {
+		*num_gpus += int64(len(c.GPUIDs))
+	}
+	resources["GPU"] = ecs.Resource{
+		Name:         utils.Strptr("GPU"),
+		Type:         utils.Strptr("INTEGER"),
+		IntegerValue: num_gpus,
+	}
+	return resources
 }
 
 // waitSteady waits for a task to leave steady-state by waiting for a new

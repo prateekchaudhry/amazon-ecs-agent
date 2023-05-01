@@ -33,12 +33,14 @@ type HostResourceManager struct {
 	taskConsumed map[string]bool //task.arn to boolean whether host resources consumed or not
 }
 
-func (h *HostResourceManager) consume(taskArn string, resources map[string]ecs.Resource) error {
+func (h *HostResourceManager) consume(taskArn string, resources map[string]ecs.Resource) (bool, error) {
 	h.hostResourceManagerRWLock.Lock()
 	defer h.hostResourceManagerRWLock.Unlock()
 
 	ok, err := h.consumable(resources)
-	return err
+	if err != nil {
+		return false, err
+	}
 	if ok {
 		// CPU
 		*h.consumedResource["CPU"].IntegerValue += *resources["CPU"].IntegerValue
@@ -70,12 +72,17 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]ecs.R
 		// GPU
 		*h.hostResource["GPU"].IntegerValue += *resources["GPU"].IntegerValue
 		h.taskConsumed[taskArn] = true
+		return true, nil
 	}
-	return nil
+	return false, nil
 }
 
 // Helper function for consume to check if resources are consumable with the current account
 // we have for the host resources. Should not call host resource manager lock in this func
+// return values
+// false, nil -> did not consume, should stay pending
+// false, err -> resources map has errors
+// true, nil -> consumed
 func (h *HostResourceManager) consumable(resources map[string]ecs.Resource) (bool, error) {
 	// CPU
 	// TODO: CPU might be optional, to verify
