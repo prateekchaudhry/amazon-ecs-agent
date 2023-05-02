@@ -212,7 +212,7 @@ func (mtask *managedTask) overseeTask() {
 		"container_mem":  mtask.Containers[0].Memory,
 		"container_port": mtask.Containers[0].Ports,
 	})
-	go mtask.monitorPendingTimeout()
+	// go mtask.monitorPendingTimeout()
 	logger.Info("Started Pending timeout go routine")
 	mtask.waitForHostResources()
 
@@ -259,25 +259,25 @@ func (mtask *managedTask) overseeTask() {
 	mtask.cleanupTask(retry.AddJitter(mtask.cfg.TaskCleanupWaitDuration, mtask.cfg.TaskCleanupWaitDurationJitter))
 }
 
-func (mtask *managedTask) monitorPendingTimeout() {
-	logger.Info("Started pending timeout go routine")
-	pendingTimeoutCtx, cancel := context.WithTimeout(mtask.ctx, mtask.cfg.TaskPendingTimeout)
-	defer cancel()
+// func (mtask *managedTask) monitorPendingTimeout() {
+// 	logger.Info("Started pending timeout go routine")
+// 	pendingTimeoutCtx, cancel := context.WithTimeout(mtask.ctx, mtask.cfg.TaskPendingTimeout)
+// 	defer cancel()
 
-	timedOut := mtask.waitEvent(pendingTimeoutCtx.Done())
-	for {
-		if timedOut {
-			// task has not transitioned to RUNNING, stop it
-			if mtask.GetKnownStatus() < apitaskstatus.TaskRunning {
-				logger.Info("Timed out, sending message to channel")
-				mtask.pendingTimeoutMessages <- pendingTimeoutTransition{}
-				break
-			}
-		} else {
-			timedOut = mtask.waitEvent(pendingTimeoutCtx.Done())
-		}
-	}
-}
+// 	timedOut := mtask.waitEvent(pendingTimeoutCtx.Done())
+// 	for {
+// 		if timedOut {
+// 			// task has not transitioned to RUNNING, stop it
+// 			if mtask.GetKnownStatus() < apitaskstatus.TaskRunning {
+// 				logger.Info("Timed out, sending message to channel")
+// 				mtask.pendingTimeoutMessages <- pendingTimeoutTransition{}
+// 				break
+// 			}
+// 		} else {
+// 			timedOut = mtask.waitEvent(pendingTimeoutCtx.Done())
+// 		}
+// 	}
+// }
 
 // shouldExit checks if the task manager should exit, as the agent is exiting.
 func (mtask *managedTask) shouldExit() bool {
