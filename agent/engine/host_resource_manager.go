@@ -39,6 +39,7 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]ecs.R
 
 	ok, err := h.consumable(resources)
 	if err != nil {
+		logger.Info("Consume error")
 		return false, err
 	}
 	if ok {
@@ -72,8 +73,10 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]ecs.R
 		// GPU
 		*h.hostResource["GPU"].IntegerValue += *resources["GPU"].IntegerValue
 		h.taskConsumed[taskArn] = true
+		logger.Info("Consume true okay")
 		return true, nil
 	}
+	logger.Info("Consume false okay")
 	return false, nil
 }
 

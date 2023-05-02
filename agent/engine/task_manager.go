@@ -204,7 +204,7 @@ func (mtask *managedTask) overseeTask() {
 	mtask.emitCurrentStatus()
 
 	// Wait for host resources required by this task to become available
-	logger.Debug("Starting wait for host resources for task with CPU/MEM resources", logger.Fields{
+	logger.Info("Starting wait for host resources for task with CPU/MEM resources", logger.Fields{
 		"task_cpu":       mtask.CPU,
 		"task_mem":       mtask.Memory,
 		"container_cpu":  mtask.Containers[0].CPU,
@@ -212,8 +212,10 @@ func (mtask *managedTask) overseeTask() {
 		"container_port": mtask.Containers[0].Ports,
 	})
 	go mtask.monitorPendingTimeout()
+        logger.Info("Started Pending timeout go routine")
 	mtask.waitForHostResources()
 
+	logger.Info("Wait over")
 	// Main infinite loop. This is where we receive messages and dispatch work.
 	for {
 		if mtask.shouldExit() {
@@ -295,10 +297,15 @@ func (mtask *managedTask) waitForHostResources() {
 		mtask.SetDesiredStatus(apitaskstatus.TaskStopped)
 		return
 	}
+	
+	if consumed {
+		logger.Info("Resources successfully consumed!")
+	}
 
 	// task failed to consume resources, we need to wait till we are actually able to consume
 	if !consumed {
 		// create a new context to wait for a pending task to stop
+		logger.Info("Resources not consumed, waiting for events and looping")
 		othersStoppedCtx, stoppedCtxCancel := context.WithCancel(mtask.ctx)
 		defer stoppedCtxCancel()
 
