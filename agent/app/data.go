@@ -65,7 +65,7 @@ func (agent *ecsAgent) loadData(containerChangeEventStream *eventstream.EventStr
 	credentialsManager credentials.Manager,
 	state dockerstate.TaskEngineState,
 	imageManager engine.ImageManager,
-	hostResourceManager engine.HostResourceManager,
+	hostResourceManager *engine.HostResourceManager,
 	execCmdMgr execcmd.Manager,
 	serviceConnectManager serviceconnect.Manager) (*savedData, error) {
 	s := &savedData{

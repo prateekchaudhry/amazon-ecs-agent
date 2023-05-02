@@ -31,7 +31,7 @@ import (
 func NewTaskEngine(cfg *config.Config, client dockerapi.DockerClient,
 	credentialsManager credentials.Manager,
 	containerChangeEventStream *eventstream.EventStream,
-	imageManager ImageManager, hostResourceManager HostResourceManager, state dockerstate.TaskEngineState,
+	imageManager ImageManager, hostResourceManager *HostResourceManager, state dockerstate.TaskEngineState,
 	metadataManager containermetadata.Manager,
 	resourceFields *taskresource.ResourceFields,
 	execCmdMgr execcmd.Manager,

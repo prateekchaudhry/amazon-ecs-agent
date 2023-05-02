@@ -324,7 +324,7 @@ func (agent *ecsAgent) doStart(containerChangeEventStream *eventstream.EventStre
 
 	// Create the task engine
 	taskEngine, currentEC2InstanceID, err := agent.newTaskEngine(
-		containerChangeEventStream, credentialsManager, state, imageManager, hostResourceManager, execCmdMgr, agent.serviceconnectManager)
+		containerChangeEventStream, credentialsManager, state, imageManager, &hostResourceManager, execCmdMgr, agent.serviceconnectManager)
 	if err != nil {
 		seelog.Criticalf("Unable to initialize new task engine: %v", err)
 		return exitcodes.ExitTerminal
@@ -531,7 +531,7 @@ func (agent *ecsAgent) newTaskEngine(containerChangeEventStream *eventstream.Eve
 	credentialsManager credentials.Manager,
 	state dockerstate.TaskEngineState,
 	imageManager engine.ImageManager,
-	hostResourceManager engine.HostResourceManager,
+	hostResourceManager *engine.HostResourceManager,
 	execCmdMgr execcmd.Manager,
 	serviceConnectManager engineserviceconnect.Manager) (engine.TaskEngine, string, error) {
 
