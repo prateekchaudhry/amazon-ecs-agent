@@ -25,6 +25,7 @@ import (
 	"time"
 
 	apiappmesh "github.com/aws/amazon-ecs-agent/agent/api/appmesh"
+	"github.com/aws/amazon-ecs-agent/agent/api/container"
 	apicontainer "github.com/aws/amazon-ecs-agent/agent/api/container"
 	apicontainerstatus "github.com/aws/amazon-ecs-agent/agent/api/container/status"
 	apieni "github.com/aws/amazon-ecs-agent/agent/api/eni"
@@ -35,6 +36,7 @@ import (
 	"github.com/aws/amazon-ecs-agent/agent/credentials"
 	"github.com/aws/amazon-ecs-agent/agent/dockerclient"
 	"github.com/aws/amazon-ecs-agent/agent/dockerclient/dockerapi"
+	"github.com/aws/amazon-ecs-agent/agent/ecs_client/model/ecs"
 	"github.com/aws/amazon-ecs-agent/agent/logger"
 	"github.com/aws/amazon-ecs-agent/agent/logger/field"
 	"github.com/aws/amazon-ecs-agent/agent/taskresource"
@@ -3477,4 +3479,102 @@ func (task *Task) IsServiceConnectConnectionDraining() bool {
 	task.lock.RLock()
 	defer task.lock.RUnlock()
 	return task.ServiceConnectConnectionDrainingUnsafe
+}
+
+func (task *Task) ToHostResources() map[string]ecs.Resource {
+	// Following this for current implementation
+	// * For CPU
+	//     * if task level CPU is set, use that
+	//     * else add up container cpus
+	// * For memory
+	//     * if task level memory is set, use that
+	//     * else add up container level -
+	//         * memoryReservation if set,
+	//         * otherwise use memory
+	resources := make(map[string]ecs.Resource)
+	// CPU
+	if task.CPU > 0 {
+		taskCPUint64 := int64(task.CPU * 1024)
+		resources["CPU"] = ecs.Resource{
+			Name:         utils.Strptr("CPU"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &taskCPUint64,
+		}
+	} else {
+		containerCPUint64 := int64(0)
+		for _, container := range task.Containers {
+			containerCPUint64 += int64(container.CPU)
+		}
+		resources["CPU"] = ecs.Resource{
+			Name:         utils.Strptr("CPU"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &containerCPUint64,
+		}
+	}
+
+	// Memory
+	if task.Memory > 0 {
+		taskMEMint64 := int64(task.Memory)
+		resources["MEMORY"] = ecs.Resource{
+			Name:         utils.Strptr("MEMORY"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &taskMEMint64,
+		}
+	} else {
+		containerMEMint64 := int64(0)
+		for _, container := range task.Containers {
+			containerMEMint64 += int64(container.Memory)
+		}
+		resources["MEMORY"] = ecs.Resource{
+			Name:         utils.Strptr("MEMORY"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &containerMEMint64,
+		}
+	}
+	// PORTS
+	var tcpPortSet []uint16
+	for _, c := range task.Containers {
+		for _, port := range c.Ports {
+			hostPort := port.HostPort
+			protocol := port.Protocol
+			if protocol == container.TransportProtocolTCP {
+				tcpPortSet = append(tcpPortSet, hostPort)
+			}
+		}
+	}
+	resources["PORTS"] = ecs.Resource{
+		Name:           utils.Strptr("PORTS"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: utils.Uint16SliceToStringSlice(tcpPortSet),
+	}
+
+	// PORTS_UDP
+	var udpPortSet []uint16
+	for _, c := range task.Containers {
+		for _, port := range c.Ports {
+			hostPort := port.HostPort
+			protocol := port.Protocol
+			if protocol == container.TransportProtocolUDP {
+				udpPortSet = append(udpPortSet, hostPort)
+			}
+		}
+	}
+	resources["PORTS_UDP"] = ecs.Resource{
+		Name:           utils.Strptr("PORTS"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: utils.Uint16SliceToStringSlice(udpPortSet),
+	}
+
+	// GPU
+	var num_gpus *int64
+	*num_gpus = 0
+	for _, c := range task.Containers {
+		*num_gpus += int64(len(c.GPUIDs))
+	}
+	resources["GPU"] = ecs.Resource{
+		Name:         utils.Strptr("GPU"),
+		Type:         utils.Strptr("INTEGER"),
+		IntegerValue: num_gpus,
+	}
+	return resources
 }

@@ -60,6 +60,8 @@ const (
 	// clean up task's containers.
 	DefaultTaskCleanupWaitDuration = 3 * time.Hour
 
+	DefaultPendingTimeout = 3 * time.Hour
+
 	// DefaultPollingMetricsWaitDuration specifies the default value for polling metrics wait duration
 	// This is only used when PollMetrics is set to true
 	DefaultPollingMetricsWaitDuration = DefaultContainerMetricsPublishInterval / 2
@@ -545,6 +547,7 @@ func environmentConfig() (Config, error) {
 		SELinuxCapable:                      parseBooleanDefaultFalseConfig("ECS_SELINUX_CAPABLE"),
 		AppArmorCapable:                     parseBooleanDefaultFalseConfig("ECS_APPARMOR_CAPABLE"),
 		TaskCleanupWaitDuration:             parseEnvVariableDuration("ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION"),
+		TaskPendingTimeout:                  parseEnvVariableDuration("ECS_PENDING_TIMEOUT"),
 		TaskCleanupWaitDurationJitter:       parseEnvVariableDuration("ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION_JITTER"),
 		TaskENIEnabled:                      parseBooleanDefaultFalseConfig("ECS_ENABLE_TASK_ENI"),
 		TaskIAMRoleEnabled:                  parseBooleanDefaultFalseConfig("ECS_ENABLE_TASK_IAM_ROLE"),

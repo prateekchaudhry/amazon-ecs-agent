@@ -776,6 +776,10 @@ func (engine *DockerTaskEngine) deleteTask(task *apitask.Task) {
 }
 
 func (engine *DockerTaskEngine) emitTaskEvent(task *apitask.Task, reason string) {
+	if task.GetKnownStatus().Terminal() {
+		resourcesToRelease := task.ToHostResources()
+		engine.hostResourceManager.release(task.Arn, resourcesToRelease)
+	}
 	event, err := api.NewTaskStateChangeEvent(task, reason)
 	if err != nil {
 		if _, ok := err.(api.ErrShouldNotSendEvent); ok {

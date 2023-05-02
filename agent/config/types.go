@@ -147,6 +147,8 @@ type Config struct {
 	// until cleanup of task resources is started.
 	TaskCleanupWaitDuration time.Duration
 
+	TaskPendingTimeout time.Duration
+
 	// TaskCleanupWaitDurationJitter specifies a jitter for task cleanup wait duration.
 	// When specified to a non-zero duration (default is zero), the task cleanup wait duration for each task
 	// will be a random duration between [TaskCleanupWaitDuration, TaskCleanupWaitDuration +

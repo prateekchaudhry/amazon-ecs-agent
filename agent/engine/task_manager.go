@@ -22,12 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/amazon-ecs-agent/agent/ecs_client/model/ecs"
 	"github.com/aws/amazon-ecs-agent/agent/engine/execcmd"
-	"github.com/aws/amazon-ecs-agent/agent/utils"
 
 	"github.com/aws/amazon-ecs-agent/agent/api"
-	"github.com/aws/amazon-ecs-agent/agent/api/container"
 	apicontainer "github.com/aws/amazon-ecs-agent/agent/api/container"
 	apicontainerstatus "github.com/aws/amazon-ecs-agent/agent/api/container/status"
 	apierrors "github.com/aws/amazon-ecs-agent/agent/api/errors"
@@ -92,6 +89,8 @@ type containerTransition struct {
 	reason         dependencygraph.DependencyError
 }
 
+type pendingTimeoutTransition struct{}
+
 // resourceTransition defines the struct for a resource to transition.
 type resourceTransition struct {
 	// nextState represents the next known status that the resource can move to
@@ -142,6 +141,7 @@ type managedTask struct {
 	dockerMessages             chan dockerContainerChange
 	resourceStateChangeEvent   chan resourceStateChange
 	stateChangeEvents          chan statechange.Event
+	pendingTimeoutMessages     chan pendingTimeoutTransition
 	containerChangeEventStream *eventstream.EventStream
 
 	// unexpectedStart is a once that controls stopping a container that
@@ -211,6 +211,7 @@ func (mtask *managedTask) overseeTask() {
 		"container_mem":  mtask.Containers[0].Memory,
 		"container_port": mtask.Containers[0].Ports,
 	})
+	go mtask.monitorPendingTimeout()
 	mtask.waitForHostResources()
 
 	// Main infinite loop. This is where we receive messages and dispatch work.
@@ -253,6 +254,16 @@ func (mtask *managedTask) overseeTask() {
 	// TODO: make this idempotent on agent restart
 	go mtask.releaseIPInIPAM()
 	mtask.cleanupTask(retry.AddJitter(mtask.cfg.TaskCleanupWaitDuration, mtask.cfg.TaskCleanupWaitDurationJitter))
+}
+
+func (mtask *managedTask) monitorPendingTimeout() {
+	pendingTimeoutCtx, cancel := context.WithTimeout(mtask.ctx, mtask.cfg.TaskPendingTimeout)
+	defer cancel()
+
+	timedOut := mtask.waitEvent(pendingTimeoutCtx.Done())
+	if timedOut {
+		mtask.pendingTimeoutMessages <- pendingTimeoutTransition{}
+	}
 }
 
 // shouldExit checks if the task manager should exit, as the agent is exiting.
@@ -312,110 +323,12 @@ func (mtask *managedTask) waitForHostResources() {
 
 func (mtask *managedTask) tryConsumeResources() (bool, error) {
 	// toHostResources maps task to []ecs.Resource
-	resources := mtask.toHostResources()
+	resources := mtask.Task.ToHostResources()
 	// Do not account for internal tasks
 	if mtask.IsInternal {
 		return true, nil
 	}
 	return mtask.engine.hostResourceManager.consume(mtask.Arn, resources)
-}
-
-func (mtask *managedTask) toHostResources() map[string]ecs.Resource {
-	// Following this for current implementation
-	// * For CPU
-	//     * if task level CPU is set, use that
-	//     * else add up container cpus
-	// * For memory
-	//     * if task level memory is set, use that
-	//     * else add up container level -
-	//         * memoryReservation if set,
-	//         * otherwise use memory
-	resources := make(map[string]ecs.Resource)
-	// CPU
-	if mtask.CPU > 0 {
-		taskCPUint64 := int64(mtask.CPU * 1024)
-		resources["CPU"] = ecs.Resource{
-			Name:         utils.Strptr("CPU"),
-			Type:         utils.Strptr("INTEGER"),
-			IntegerValue: &taskCPUint64,
-		}
-	} else {
-		containerCPUint64 := int64(0)
-		for _, container := range mtask.Containers {
-			containerCPUint64 += int64(container.CPU)
-		}
-		resources["CPU"] = ecs.Resource{
-			Name:         utils.Strptr("CPU"),
-			Type:         utils.Strptr("INTEGER"),
-			IntegerValue: &containerCPUint64,
-		}
-	}
-
-	// Memory
-	if mtask.Memory > 0 {
-		taskMEMint64 := int64(mtask.Memory)
-		resources["MEMORY"] = ecs.Resource{
-			Name:         utils.Strptr("MEMORY"),
-			Type:         utils.Strptr("INTEGER"),
-			IntegerValue: &taskMEMint64,
-		}
-	} else {
-		containerMEMint64 := int64(0)
-		for _, container := range mtask.Containers {
-			containerMEMint64 += int64(container.Memory)
-		}
-		resources["MEMORY"] = ecs.Resource{
-			Name:         utils.Strptr("MEMORY"),
-			Type:         utils.Strptr("INTEGER"),
-			IntegerValue: &containerMEMint64,
-		}
-	}
-	// PORTS
-	var tcpPortSet []uint16
-	for _, c := range mtask.Containers {
-		for _, port := range c.Ports {
-			hostPort := port.HostPort
-			protocol := port.Protocol
-			if protocol == container.TransportProtocolTCP {
-				tcpPortSet = append(tcpPortSet, hostPort)
-			}
-		}
-	}
-	resources["PORTS"] = ecs.Resource{
-		Name:           utils.Strptr("PORTS"),
-		Type:           utils.Strptr("STRINGSET"),
-		StringSetValue: utils.Uint16SliceToStringSlice(tcpPortSet),
-	}
-
-	// PORTS_UDP
-	var udpPortSet []uint16
-	for _, c := range mtask.Containers {
-		for _, port := range c.Ports {
-			hostPort := port.HostPort
-			protocol := port.Protocol
-			if protocol == container.TransportProtocolUDP {
-				udpPortSet = append(udpPortSet, hostPort)
-			}
-		}
-	}
-	resources["PORTS_UDP"] = ecs.Resource{
-		Name:           utils.Strptr("PORTS"),
-		Type:           utils.Strptr("STRINGSET"),
-		StringSetValue: utils.Uint16SliceToStringSlice(udpPortSet),
-	}
-
-	// GPU
-	var num_gpus *int64
-	*num_gpus = 0
-	for _, c := range mtask.Containers {
-		*num_gpus += int64(len(c.GPUIDs))
-	}
-	resources["GPU"] = ecs.Resource{
-		Name:         utils.Strptr("GPU"),
-		Type:         utils.Strptr("INTEGER"),
-		IntegerValue: num_gpus,
-	}
-	return resources
 }
 
 // waitSteady waits for a task to leave steady-state by waiting for a new
@@ -496,6 +409,10 @@ func (mtask *managedTask) waitEvent(stopWaiting <-chan struct{}) bool {
 		return false
 	case <-stopWaiting:
 		return true
+	case <-mtask.pendingTimeoutMessages:
+		logger.Info(fmt.Sprintf("Received pending timeout message for %s", mtask.Arn))
+		mtask.handleDesiredStatusChange(apitaskstatus.TaskStopped, 0)
+		return false
 	}
 }
 
@@ -710,6 +627,10 @@ func getContainerEventLogFields(c api.ContainerStateChange) logger.Fields {
 
 func (mtask *managedTask) emitTaskEvent(task *apitask.Task, reason string) {
 	taskKnownStatus := task.GetKnownStatus()
+	if taskKnownStatus.Terminal() {
+		resourcesToRelease := mtask.Task.ToHostResources()
+		mtask.engine.hostResourceManager.release(mtask.Arn, resourcesToRelease)
+	}
 	if !taskKnownStatus.BackendRecognized() {
 		logger.Debug("Skipping event emission for task", logger.Fields{
 			field.TaskID: mtask.GetID(),
