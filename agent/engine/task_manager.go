@@ -263,8 +263,13 @@ func (mtask *managedTask) monitorPendingTimeout() {
 	defer cancel()
 
 	timedOut := mtask.waitEvent(pendingTimeoutCtx.Done())
-	if timedOut {
-		mtask.pendingTimeoutMessages <- pendingTimeoutTransition{}
+	for {
+		if timedOut {
+			mtask.pendingTimeoutMessages <- pendingTimeoutTransition{}
+			break
+		} else {
+			timedOut = mtask.waitEvent(pendingTimeoutCtx.Done())
+		}
 	}
 }
 
