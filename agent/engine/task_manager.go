@@ -178,6 +178,7 @@ func (engine *DockerTaskEngine) newManagedTask(task *apitask.Task) *managedTask 
 		acsMessages:                   make(chan acsTransition),
 		dockerMessages:                make(chan dockerContainerChange),
 		resourceStateChangeEvent:      make(chan resourceStateChange),
+		pendingTimeoutMessages:        make(chan pendingTimeoutTransition),
 		engine:                        engine,
 		cfg:                           engine.cfg,
 		stateChangeEvents:             engine.stateChangeEvents,
@@ -212,7 +213,7 @@ func (mtask *managedTask) overseeTask() {
 		"container_port": mtask.Containers[0].Ports,
 	})
 	go mtask.monitorPendingTimeout()
-        logger.Info("Started Pending timeout go routine")
+	logger.Info("Started Pending timeout go routine")
 	mtask.waitForHostResources()
 
 	logger.Info("Wait over")
@@ -259,14 +260,19 @@ func (mtask *managedTask) overseeTask() {
 }
 
 func (mtask *managedTask) monitorPendingTimeout() {
+	logger.Info("Started pending timeout go routine")
 	pendingTimeoutCtx, cancel := context.WithTimeout(mtask.ctx, mtask.cfg.TaskPendingTimeout)
 	defer cancel()
 
 	timedOut := mtask.waitEvent(pendingTimeoutCtx.Done())
 	for {
 		if timedOut {
-			mtask.pendingTimeoutMessages <- pendingTimeoutTransition{}
-			break
+			// task has not transitioned to RUNNING, stop it
+			if mtask.GetKnownStatus() < apitaskstatus.TaskRunning {
+				logger.Info("Timed out, sending message to channel")
+				mtask.pendingTimeoutMessages <- pendingTimeoutTransition{}
+				break
+			}
 		} else {
 			timedOut = mtask.waitEvent(pendingTimeoutCtx.Done())
 		}
@@ -302,7 +308,7 @@ func (mtask *managedTask) waitForHostResources() {
 		mtask.SetDesiredStatus(apitaskstatus.TaskStopped)
 		return
 	}
-	
+
 	if consumed {
 		logger.Info("Resources successfully consumed!")
 	}
