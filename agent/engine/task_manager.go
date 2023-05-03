@@ -206,11 +206,11 @@ func (mtask *managedTask) overseeTask() {
 
 	// Wait for host resources required by this task to become available
 	logger.Info("Starting wait for host resources for task with CPU/MEM resources", logger.Fields{
-		"task_cpu":       mtask.CPU,
-		"task_mem":       mtask.Memory,
-		"container_cpu":  mtask.Containers[0].CPU,
-		"container_mem":  mtask.Containers[0].Memory,
-		"container_port": mtask.Containers[0].Ports,
+		"task_cpu":        mtask.CPU,
+		"task_mem":        mtask.Memory,
+		"container_cpu":   mtask.Containers[0].CPU,
+		"container_mem":   mtask.Containers[0].Memory,
+		"container_ports": len(mtask.Containers[0].Ports),
 	})
 	// go mtask.monitorPendingTimeout()
 	logger.Info("Started Pending timeout go routine")
@@ -332,6 +332,7 @@ func (mtask *managedTask) waitForHostResources() {
 			consumed, err = mtask.tryConsumeResources()
 			if consumed {
 				// Resources consumed, no need to wait
+				logger.Info("Resources successfully consumed in loop!")
 				break
 			}
 

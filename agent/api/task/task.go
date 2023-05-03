@@ -3566,15 +3566,15 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 	}
 
 	// GPU
-	var num_gpus *int64
-	*num_gpus = 0
+	var num_gpus int64
+	num_gpus = 0
 	for _, c := range task.Containers {
-		*num_gpus += int64(len(c.GPUIDs))
+		num_gpus += int64(len(c.GPUIDs))
 	}
 	resources["GPU"] = ecs.Resource{
 		Name:         utils.Strptr("GPU"),
 		Type:         utils.Strptr("INTEGER"),
-		IntegerValue: num_gpus,
+		IntegerValue: &num_gpus,
 	}
 	return resources
 }
