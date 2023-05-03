@@ -214,7 +214,7 @@ func NewHostResourceManager(hostResource []*ecs.Resource, totalGPU int64) HostRe
 	resourceMap := make(map[string]ecs.Resource)
 	consumedResourceMap := make(map[string]ecs.Resource)
 	taskConsumed := make(map[string]bool)
-	// assignes CPU, MEMORY, PORTS, PORTS_UDP from host
+	// assigns CPU, MEMORY, PORTS, PORTS_UDP from host
 	for _, resource := range hostResource {
 		resourceMap[*resource.Name] = *resource
 	}
@@ -238,19 +238,18 @@ func NewHostResourceManager(hostResource []*ecs.Resource, totalGPU int64) HostRe
 		IntegerValue: &memory,
 	}
 	//PORTS
-	var portSlice []*string
+	//Copying ports from host resources as consumed ports for initializing
 	consumedResourceMap["PORTS"] = ecs.Resource{
 		Name:           utils.Strptr("PORTS"),
 		Type:           utils.Strptr("INTEGER"),
-		StringSetValue: portSlice,
+		StringSetValue: resourceMap["PORTS"].StringSetValue,
 	}
 
 	//PORTS_UDP
-	var portUDPSlice []*string
 	consumedResourceMap["PORTS_UDP"] = ecs.Resource{
 		Name:           utils.Strptr("PORTS_UDP"),
 		Type:           utils.Strptr("INTEGER"),
-		StringSetValue: portUDPSlice,
+		StringSetValue: resourceMap["PORTS_UDP"].StringSetValue,
 	}
 
 	//GPUs
@@ -261,6 +260,8 @@ func NewHostResourceManager(hostResource []*ecs.Resource, totalGPU int64) HostRe
 		IntegerValue: &numGPUs,
 	}
 
+	logger.Info("Initializing host resource manager, host resource", logger.Fields{"hostResource": resourceMap})
+	logger.Info("Initializing host resource manager, consumed resource", logger.Fields{"consumedResource": consumedResourceMap})
 	return HostResourceManager{
 		hostResource:     resourceMap,
 		consumedResource: consumedResourceMap,

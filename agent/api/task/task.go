@@ -3494,13 +3494,16 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 	resources := make(map[string]ecs.Resource)
 	// CPU
 	if task.CPU > 0 {
+		// Assuming it is vcpus, converting to cpu shares
 		taskCPUint64 := int64(task.CPU * 1024)
+		logger.Info("Sourcing CPU from task level", logger.Fields{"CPU": taskCPUint64})
 		resources["CPU"] = ecs.Resource{
 			Name:         utils.Strptr("CPU"),
 			Type:         utils.Strptr("INTEGER"),
 			IntegerValue: &taskCPUint64,
 		}
 	} else {
+		// Assuming it is cpu shares
 		containerCPUint64 := int64(0)
 		for _, container := range task.Containers {
 			containerCPUint64 += int64(container.CPU)
@@ -3510,11 +3513,14 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 			Type:         utils.Strptr("INTEGER"),
 			IntegerValue: &containerCPUint64,
 		}
+		logger.Info("Sourcing CPU from container level", logger.Fields{"CPU": containerCPUint64})
 	}
 
 	// Memory
 	if task.Memory > 0 {
-		taskMEMint64 := int64(task.Memory)
+		//bytes
+		taskMEMint64 := int64(task.Memory) * 1024 * 1024
+		logger.Info("Sourcing MEMORY from TASK level", logger.Fields{"MEMORY": taskMEMint64})
 		resources["MEMORY"] = ecs.Resource{
 			Name:         utils.Strptr("MEMORY"),
 			Type:         utils.Strptr("INTEGER"),
@@ -3522,19 +3528,39 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 		}
 	} else {
 		containerMEMint64 := int64(0)
-		for _, container := range task.Containers {
-			containerMEMint64 += int64(container.Memory)
+		// To parse memory reservation / soft limit
+		hostConfig := &dockercontainer.HostConfig{}
+
+		for _, c := range task.Containers {
+			if c.DockerConfig.HostConfig != nil {
+				if c.DockerConfig.HostConfig != nil {
+					err := json.Unmarshal([]byte(*c.DockerConfig.HostConfig), hostConfig)
+					if err != nil {
+						logger.Info("Error parsing docker config, defaulting to container level memory")
+						containerMEMint64 += int64(c.Memory)
+					} else {
+						logger.Info("Sourcing memory resource from hostConfig.MemoryReservation")
+						containerMEMint64 += hostConfig.MemoryReservation
+					}
+				}
+			} else {
+				logger.Info("Sourcing memory resource from hostConfig.MemoryReservation")
+				containerMEMint64 += int64(c.Memory)
+			}
 		}
+		logger.Info("MEMORY", logger.Fields{"MEMORY": containerMEMint64})
 		resources["MEMORY"] = ecs.Resource{
 			Name:         utils.Strptr("MEMORY"),
 			Type:         utils.Strptr("INTEGER"),
 			IntegerValue: &containerMEMint64,
 		}
 	}
+
 	// PORTS
 	var tcpPortSet []uint16
 	for _, c := range task.Containers {
 		for _, port := range c.Ports {
+			// TODO: Should check what happens in case of dynamic port mapping
 			hostPort := port.HostPort
 			protocol := port.Protocol
 			if protocol == container.TransportProtocolTCP {
@@ -3542,6 +3568,7 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 			}
 		}
 	}
+	logger.Info("PORTS", logger.Fields{"TCP ports": tcpPortSet})
 	resources["PORTS"] = ecs.Resource{
 		Name:           utils.Strptr("PORTS"),
 		Type:           utils.Strptr("STRINGSET"),
@@ -3559,6 +3586,7 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 			}
 		}
 	}
+	logger.Info("PORTS_UDP", logger.Fields{"UDP ports": udpPortSet})
 	resources["PORTS_UDP"] = ecs.Resource{
 		Name:           utils.Strptr("PORTS"),
 		Type:           utils.Strptr("STRINGSET"),
