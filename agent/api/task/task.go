@@ -3535,8 +3535,8 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 			if c.DockerConfig.HostConfig != nil {
 				if c.DockerConfig.HostConfig != nil {
 					err := json.Unmarshal([]byte(*c.DockerConfig.HostConfig), hostConfig)
-					if err != nil {
-						logger.Info("Error parsing docker config, defaulting to container level memory")
+					if err != nil || hostConfig.MemoryReservation == 0 {
+						logger.Info("Defaulting to container level memory")
 						containerMEMint64 += int64(c.Memory)
 					} else {
 						logger.Info("Sourcing memory resource from hostConfig.MemoryReservation")
