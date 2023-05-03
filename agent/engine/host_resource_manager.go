@@ -213,6 +213,7 @@ func (h *HostResourceManager) release(taskArn string, resources map[string]ecs.R
 func NewHostResourceManager(hostResource []*ecs.Resource, totalGPU int64) HostResourceManager {
 	resourceMap := make(map[string]ecs.Resource)
 	consumedResourceMap := make(map[string]ecs.Resource)
+	taskConsumed := make(map[string]bool)
 	// assignes CPU, MEMORY, PORTS, PORTS_UDP from host
 	for _, resource := range hostResource {
 		resourceMap[*resource.Name] = *resource
@@ -222,8 +223,47 @@ func NewHostResourceManager(hostResource []*ecs.Resource, totalGPU int64) HostRe
 		Type:         utils.Strptr("INTEGER"),
 		IntegerValue: &totalGPU,
 	}
+	//CPU
+	CPUs := int64(0)
+	consumedResourceMap["CPU"] = ecs.Resource{
+		Name:         utils.Strptr("CPU"),
+		Type:         utils.Strptr("INTEGER"),
+		IntegerValue: &CPUs,
+	}
+	//MEMORY
+	memory := int64(0)
+	consumedResourceMap["MEMORY"] = ecs.Resource{
+		Name:         utils.Strptr("MEMORY"),
+		Type:         utils.Strptr("INTEGER"),
+		IntegerValue: &memory,
+	}
+	//PORTS
+	var portSlice []*string
+	consumedResourceMap["PORTS"] = ecs.Resource{
+		Name:           utils.Strptr("PORTS"),
+		Type:           utils.Strptr("INTEGER"),
+		StringSetValue: portSlice,
+	}
+
+	//PORTS_UDP
+	var portUDPSlice []*string
+	consumedResourceMap["PORTS_UDP"] = ecs.Resource{
+		Name:           utils.Strptr("PORTS_UDP"),
+		Type:           utils.Strptr("INTEGER"),
+		StringSetValue: portUDPSlice,
+	}
+
+	//GPUs
+	numGPUs := int64(0)
+	consumedResourceMap["GPU"] = ecs.Resource{
+		Name:         utils.Strptr("GPU"),
+		Type:         utils.Strptr("INTEGER"),
+		IntegerValue: &numGPUs,
+	}
+
 	return HostResourceManager{
 		hostResource:     resourceMap,
 		consumedResource: consumedResourceMap,
+		taskConsumed:     taskConsumed,
 	}
 }
