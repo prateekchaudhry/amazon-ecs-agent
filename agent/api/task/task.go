@@ -3494,7 +3494,8 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 	resources := make(map[string]ecs.Resource)
 	// CPU
 	if task.CPU > 0 {
-		// Assuming it is vcpus, converting to cpu shares
+		// cpu unit is vcpu at task level
+		// Converting to cpushares
 		taskCPUint64 := int64(task.CPU * 1024)
 		logger.Info("Sourcing CPU from task level", logger.Fields{"CPU": taskCPUint64})
 		resources["CPU"] = ecs.Resource{
@@ -3503,7 +3504,7 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 			IntegerValue: &taskCPUint64,
 		}
 	} else {
-		// Assuming it is cpu shares
+		// cpu unit is cpushares at container level, keeping as is
 		containerCPUint64 := int64(0)
 		for _, container := range task.Containers {
 			containerCPUint64 += int64(container.CPU)
@@ -3518,8 +3519,8 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 
 	// Memory
 	if task.Memory > 0 {
-		//bytes
-		taskMEMint64 := int64(task.Memory) * 1024 * 1024
+		// memory unit is MiB at task level
+		taskMEMint64 := task.Memory
 		logger.Info("Sourcing MEMORY from TASK level", logger.Fields{"MEMORY": taskMEMint64})
 		resources["MEMORY"] = ecs.Resource{
 			Name:         utils.Strptr("MEMORY"),
@@ -3535,16 +3536,20 @@ func (task *Task) ToHostResources() map[string]ecs.Resource {
 			if c.DockerConfig.HostConfig != nil {
 				if c.DockerConfig.HostConfig != nil {
 					err := json.Unmarshal([]byte(*c.DockerConfig.HostConfig), hostConfig)
-					if err != nil || hostConfig.MemoryReservation == 0 {
+					if err != nil || hostConfig.MemoryReservation <= 0 {
 						logger.Info("Defaulting to container level memory")
+						// container memory unit is MiB, keeping as is
 						containerMEMint64 += int64(c.Memory)
 					} else {
 						logger.Info("Sourcing memory resource from hostConfig.MemoryReservation")
-						containerMEMint64 += hostConfig.MemoryReservation
+						// Soft limit is specified in MiB units but translated to bytes while being transferred to Agent
+						// Converting back to MiB
+						containerMEMint64 += hostConfig.MemoryReservation / (1024 * 1024)
 					}
 				}
 			} else {
 				logger.Info("Sourcing memory resource from hostConfig.MemoryReservation")
+				// container memory unit is MiB, keeping as is
 				containerMEMint64 += int64(c.Memory)
 			}
 		}
