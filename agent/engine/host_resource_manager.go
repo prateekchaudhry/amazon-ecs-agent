@@ -37,6 +37,10 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]ecs.R
 	h.hostResourceManagerRWLock.Lock()
 	defer h.hostResourceManagerRWLock.Unlock()
 
+	logger.Info("Consume called with resources", logger.Fields{"resources": resources})
+	logger.Info("Consume called", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource, "h.taskConsumed": h.taskConsumed})
+	defer logger.Info("Consume done", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource, "h.taskConsumed": h.taskConsumed})
+
 	ok, err := h.consumable(resources)
 	if err != nil {
 		logger.Info("Consume error")
@@ -157,7 +161,8 @@ func (h *HostResourceManager) consumable(resources map[string]ecs.Resource) (boo
 func (h *HostResourceManager) release(taskArn string, resources map[string]ecs.Resource) {
 	h.hostResourceManagerRWLock.Lock()
 	defer h.hostResourceManagerRWLock.Unlock()
-
+	logger.Info("Release called with resources", logger.Fields{"resources": resources})
+	logger.Info("Release called", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource})
 	if h.taskConsumed[taskArn] {
 		// CPU
 		*h.consumedResource["CPU"].IntegerValue -= *resources["CPU"].IntegerValue
@@ -208,6 +213,7 @@ func (h *HostResourceManager) release(taskArn string, resources map[string]ecs.R
 		*h.consumedResource["GPU"].IntegerValue -= *resources["GPU"].IntegerValue
 		delete(h.taskConsumed, taskArn)
 	}
+	logger.Info("Release done", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource, "h.taskConsumed": h.taskConsumed})
 }
 
 func NewHostResourceManager(hostResource []*ecs.Resource, totalGPU int64) HostResourceManager {
