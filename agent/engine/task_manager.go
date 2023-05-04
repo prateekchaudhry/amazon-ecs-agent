@@ -302,6 +302,12 @@ func (mtask *managedTask) emitCurrentStatus() {
 // the task. This involves waiting for previous stops to complete so the
 // resources become free.
 func (mtask *managedTask) waitForHostResources() {
+	if mtask.GetDesiredStatus().Terminal() {
+		// Task's desired status is STOPPED. No need to wait in this case
+		return
+	}
+
+	// Try account for task resources in host resource manager
 	consumed, err := mtask.tryConsumeResources()
 	if err != nil {
 		logger.Error("Error consuming resources due to invalid task config")
@@ -311,10 +317,8 @@ func (mtask *managedTask) waitForHostResources() {
 
 	if consumed {
 		logger.Info("Resources successfully consumed!")
-	}
-
-	// task failed to consume resources, we need to wait till we are actually able to consume
-	if !consumed {
+	} else {
+		// task failed to consume resources, we need to wait till we are actually able to consume
 		// create a new context to wait for a pending task to stop
 		logger.Info("Resources not consumed, waiting for events and looping")
 		othersStoppedCtx, stoppedCtxCancel := context.WithCancel(mtask.ctx)
