@@ -141,6 +141,7 @@ type managedTask struct {
 	dockerMessages             chan dockerContainerChange
 	resourceStateChangeEvent   chan resourceStateChange
 	stateChangeEvents          chan statechange.Event
+	stoppedTaskMessages        chan struct{}
 	pendingTimeoutMessages     chan pendingTimeoutTransition
 	containerChangeEventStream *eventstream.EventStream
 
@@ -178,6 +179,7 @@ func (engine *DockerTaskEngine) newManagedTask(task *apitask.Task) *managedTask 
 		acsMessages:                   make(chan acsTransition),
 		dockerMessages:                make(chan dockerContainerChange),
 		resourceStateChangeEvent:      make(chan resourceStateChange),
+		stoppedTaskMessages:           make(chan struct{}),
 		pendingTimeoutMessages:        make(chan pendingTimeoutTransition),
 		engine:                        engine,
 		cfg:                           engine.cfg,
@@ -254,6 +256,8 @@ func (mtask *managedTask) overseeTask() {
 	mtask.engine.checkTearDownPauseContainer(mtask.Task)
 	// TODO [SC]: We need to also tear down pause containets in bridge mode for SC-enabled tasks
 	mtask.cleanupCredentials()
+	// This task is done, wake up monitoring go routine to send wake up any tasks waiting for resources
+	mtask.engine.taskStopEvents <- struct{}{}
 	// TODO: make this idempotent on agent restart
 	go mtask.releaseIPInIPAM()
 	mtask.cleanupTask(retry.AddJitter(mtask.cfg.TaskCleanupWaitDuration, mtask.cfg.TaskCleanupWaitDurationJitter))
@@ -307,7 +311,7 @@ func (mtask *managedTask) waitForHostResources() {
 		return
 	}
 
-	// Try account for task resources in host resource manager
+	// First try at account for task resources in host resource manager
 	consumed, err := mtask.tryConsumeResources()
 	if err != nil {
 		logger.Error("Error consuming resources due to invalid task config")
@@ -321,25 +325,28 @@ func (mtask *managedTask) waitForHostResources() {
 		// task failed to consume resources, we need to wait till we are actually able to consume
 		// create a new context to wait for a pending task to stop
 		logger.Info("Resources not consumed, waiting for events and looping")
-		othersStoppedCtx, stoppedCtxCancel := context.WithCancel(mtask.ctx)
-		defer stoppedCtxCancel()
 
-		for !mtask.waitEvent(othersStoppedCtx.Done()) {
-			// if we are here that means a task has stopped
+		// channel to sleep on, this task's own stopping task channel
+		for {
+			// wait for some event
+			if mtask.waitEvent(mtask.stoppedTaskMessages) {
+				// got event from monitoring routine, try consume host resources
+				logger.Info("Task woke up to try consume resources", logger.Fields{"mtask.Arn": mtask.Arn})
+
+				consumed, err = mtask.tryConsumeResources()
+				if consumed {
+					// Resources consumed, no need to wait
+					logger.Info("Resources successfully consumed in loop!")
+					break
+				}
+			}
+
 			if mtask.GetDesiredStatus().Terminal() {
 				// If we end up here, that means we received a start then stop for this
 				// task before a task that was expected to stop before it could
 				// actually stop, no need to consume resources here
 				break
 			}
-
-			consumed, err = mtask.tryConsumeResources()
-			if consumed {
-				// Resources consumed, no need to wait
-				logger.Info("Resources successfully consumed in loop!")
-				break
-			}
-
 		}
 	}
 }

@@ -135,6 +135,7 @@ type DockerTaskEngine struct {
 	managedTasks map[string]*managedTask
 
 	events            <-chan dockerapi.DockerContainerChangeEvent
+	taskStopEvents    chan struct{}
 	stateChangeEvents chan statechange.Event
 
 	client       dockerapi.DockerClient
@@ -206,6 +207,7 @@ func NewDockerTaskEngine(cfg *config.Config,
 
 		state:             state,
 		managedTasks:      make(map[string]*managedTask),
+		taskStopEvents:    make(chan struct{}),
 		stateChangeEvents: make(chan statechange.Event),
 
 		credentialsManager: credentialsManager,
@@ -230,8 +232,29 @@ func NewDockerTaskEngine(cfg *config.Config,
 	}
 
 	dockerTaskEngine.initializeContainerStatusToTransitionFunction()
+	go dockerTaskEngine.monitorWaitingTasks()
 
 	return dockerTaskEngine
+}
+
+func (engine *DockerTaskEngine) monitorWaitingTasks() {
+	for {
+		select {
+		// listen on this channel for a stopped task
+		case <-engine.taskStopEvents:
+			// loop over managed tasks and send waking signals
+			// if any task is waiting in waitForHostResources, it should wake up and try consume resources now
+			for _, task := range engine.managedTasks {
+				logger.Info("Sending waking signal to task if it sleeping", logger.Fields{"task.Arn": task.Arn})
+				select {
+				case task.stoppedTaskMessages <- struct{}{}:
+					// wake up if the task is sleeping on it
+				default:
+					// else don't block on it and move on
+				}
+			}
+		}
+	}
 }
 
 func (engine *DockerTaskEngine) initializeContainerStatusToTransitionFunction() {
