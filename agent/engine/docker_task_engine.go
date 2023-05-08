@@ -298,6 +298,7 @@ func (engine *DockerTaskEngine) Init(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	engine.reconcileHostResources()
 	engine.synchronizeState()
 	// Now catch up and start processing new events per normal
 	go engine.handleDockerEvents(derivedCtx)
@@ -490,6 +491,30 @@ func (engine *DockerTaskEngine) synchronizeState() {
 
 	for _, task := range tasksToStart {
 		engine.startTask(task)
+	}
+}
+
+// Reconcile state of host resource manager with task status in managedTasks Slice
+// Should be done on task restarts
+// Also done periodically as a sanity restoration in case they happen to diverge, always use managedTasks
+// as the
+func (engine *DockerTaskEngine) reconcileHostResources() {
+	for _, task := range engine.managedTasks {
+		taskStatus := task.GetKnownStatus()
+		resources := task.ToHostResources()
+
+		// Release stopped tasks host resources
+		// Idempotent call
+		if taskStatus.Terminal() {
+			engine.hostResourceManager.release(task.Arn, resources)
+			continue
+		}
+
+		// Consume host resources if task has progressed
+		// Idempotent call
+		if taskStatus > apitaskstatus.TaskCreated {
+			engine.hostResourceManager.consume(task.Arn, resources)
+		}
 	}
 }
 

@@ -41,6 +41,13 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]ecs.R
 	logger.Info("Consume called", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource, "h.taskConsumed": h.taskConsumed})
 	defer logger.Info("Consume done", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource, "h.taskConsumed": h.taskConsumed})
 
+	// Check if already consumed
+	_, ok := h.consumedResource[taskArn]
+	if ok {
+		// Nothing to do
+		return true, nil
+	}
+
 	ok, err := h.consumable(resources)
 	if err != nil {
 		logger.Info("Consume error")
