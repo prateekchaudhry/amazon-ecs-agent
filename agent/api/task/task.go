@@ -26,6 +26,7 @@ import (
 
 	"github.com/aws/amazon-ecs-agent/agent/acs/model/ecsacs"
 	apiappmesh "github.com/aws/amazon-ecs-agent/agent/api/appmesh"
+	"github.com/aws/amazon-ecs-agent/agent/api/container"
 	apicontainer "github.com/aws/amazon-ecs-agent/agent/api/container"
 	apicontainerstatus "github.com/aws/amazon-ecs-agent/agent/api/container/status"
 	apieni "github.com/aws/amazon-ecs-agent/agent/api/eni"
@@ -36,6 +37,7 @@ import (
 	"github.com/aws/amazon-ecs-agent/agent/credentials"
 	"github.com/aws/amazon-ecs-agent/agent/dockerclient"
 	"github.com/aws/amazon-ecs-agent/agent/dockerclient/dockerapi"
+	"github.com/aws/amazon-ecs-agent/agent/ecs_client/model/ecs"
 	"github.com/aws/amazon-ecs-agent/agent/logger"
 	"github.com/aws/amazon-ecs-agent/agent/logger/field"
 	"github.com/aws/amazon-ecs-agent/agent/taskresource"
@@ -3501,4 +3503,143 @@ func (task *Task) IsServiceConnectConnectionDraining() bool {
 	task.lock.RLock()
 	defer task.lock.RUnlock()
 	return task.ServiceConnectConnectionDrainingUnsafe
+}
+
+// ToHostResources will convert a task to a map of resources which ECS takes into account when scheduling tasks on instances
+// * CPU
+//   - If task level CPU is set, use that
+//   - Else add up container CPUs
+//
+// * Memory
+//   - If task level memory is set, use that
+//   - Else add up container level
+//   - If memoryReservation field is set, use that
+//   - Else use memory field
+//
+// * Ports (TCP/UDP)
+//   - Only account for hostPort
+//   - Don't need to account for awsvpc mode, each task gets its own namespace
+//
+// * GPU
+//   - Return num of gpus requested (len of GPUIDs field)
+func (task *Task) ToHostResources() map[string]*ecs.Resource {
+	resources := make(map[string]*ecs.Resource)
+	// CPU
+	if task.CPU > 0 {
+		// cpu unit is vcpu at task level
+		// Converting to cpushares
+		taskCPUint64 := int64(task.CPU * 1024)
+		logger.Info("Sourcing CPU from task level", logger.Fields{"CPU": taskCPUint64})
+		resources["CPU"] = &ecs.Resource{
+			Name:         utils.Strptr("CPU"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &taskCPUint64,
+		}
+	} else {
+		// cpu unit is cpushares at container level, keeping as is
+		containerCPUint64 := int64(0)
+		for _, container := range task.Containers {
+			containerCPUint64 += int64(container.CPU)
+		}
+		resources["CPU"] = &ecs.Resource{
+			Name:         utils.Strptr("CPU"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &containerCPUint64,
+		}
+		logger.Info("Sourcing CPU from container level", logger.Fields{"CPU": containerCPUint64})
+	}
+
+	// Memory
+	if task.Memory > 0 {
+		// memory unit is MiB at task level
+		taskMEMint64 := task.Memory
+		logger.Info("Sourcing MEMORY from TASK level", logger.Fields{"MEMORY": taskMEMint64})
+		resources["MEMORY"] = &ecs.Resource{
+			Name:         utils.Strptr("MEMORY"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &taskMEMint64,
+		}
+	} else {
+		containerMEMint64 := int64(0)
+		// To parse memory reservation / soft limit
+		hostConfig := &dockercontainer.HostConfig{}
+
+		for _, c := range task.Containers {
+			if c.DockerConfig.HostConfig != nil {
+				if c.DockerConfig.HostConfig != nil {
+					err := json.Unmarshal([]byte(*c.DockerConfig.HostConfig), hostConfig)
+					if err != nil || hostConfig.MemoryReservation <= 0 {
+						logger.Info("Defaulting to container level memory")
+						// container memory unit is MiB, keeping as is
+						containerMEMint64 += int64(c.Memory)
+					} else {
+						logger.Info("Sourcing memory resource from hostConfig.MemoryReservation")
+						// Soft limit is specified in MiB units but translated to bytes while being transferred to Agent
+						// Converting back to MiB
+						containerMEMint64 += hostConfig.MemoryReservation / (1024 * 1024)
+					}
+				}
+			} else {
+				logger.Info("Sourcing memory resource from hostConfig.MemoryReservation")
+				// container memory unit is MiB, keeping as is
+				containerMEMint64 += int64(c.Memory)
+			}
+		}
+		logger.Info("MEMORY", logger.Fields{"MEMORY": containerMEMint64})
+		resources["MEMORY"] = &ecs.Resource{
+			Name:         utils.Strptr("MEMORY"),
+			Type:         utils.Strptr("INTEGER"),
+			IntegerValue: &containerMEMint64,
+		}
+	}
+
+	// PORTS
+	var tcpPortSet []uint16
+	for _, c := range task.Containers {
+		for _, port := range c.Ports {
+			// TODO: Should check what happens in case of dynamic port mapping
+			hostPort := port.HostPort
+			protocol := port.Protocol
+			if protocol == container.TransportProtocolTCP {
+				tcpPortSet = append(tcpPortSet, hostPort)
+			}
+		}
+	}
+	logger.Info("PORTS", logger.Fields{"TCP ports": tcpPortSet})
+	resources["PORTS"] = &ecs.Resource{
+		Name:           utils.Strptr("PORTS"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: utils.Uint16SliceToStringSlice(tcpPortSet),
+	}
+
+	// PORTS_UDP
+	var udpPortSet []uint16
+	for _, c := range task.Containers {
+		for _, port := range c.Ports {
+			hostPort := port.HostPort
+			protocol := port.Protocol
+			if protocol == container.TransportProtocolUDP {
+				udpPortSet = append(udpPortSet, hostPort)
+			}
+		}
+	}
+	logger.Info("PORTS_UDP", logger.Fields{"UDP ports": udpPortSet})
+	resources["PORTS_UDP"] = &ecs.Resource{
+		Name:           utils.Strptr("PORTS"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: utils.Uint16SliceToStringSlice(udpPortSet),
+	}
+
+	// GPU
+	var num_gpus int64
+	num_gpus = 0
+	for _, c := range task.Containers {
+		num_gpus += int64(len(c.GPUIDs))
+	}
+	resources["GPU"] = &ecs.Resource{
+		Name:         utils.Strptr("GPU"),
+		Type:         utils.Strptr("INTEGER"),
+		IntegerValue: &num_gpus,
+	}
+	return resources
 }
