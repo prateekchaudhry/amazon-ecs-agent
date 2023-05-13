@@ -38,7 +38,7 @@ type HostResourceManager struct {
 // false, nil -> did not consume, should stay pending
 // false, err -> resources map has errors, something went wrong
 // true, nil -> successfully consumed
-func (h *HostResourceManager) consume(taskArn string, resources map[string]ecs.Resource) (bool, error) {
+func (h *HostResourceManager) consume(taskArn string, resources map[string]*ecs.Resource) (bool, error) {
 	h.hostResourceManagerRWLock.Lock()
 	defer h.hostResourceManagerRWLock.Unlock()
 
@@ -107,7 +107,7 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]ecs.R
 // Helper function for consume to check if resources are consumable with the current account
 // we have for the host resources. Should not call host resource manager lock in this func
 // return values
-func (h *HostResourceManager) consumable(resources map[string]ecs.Resource) (bool, error) {
+func (h *HostResourceManager) consumable(resources map[string]*ecs.Resource) (bool, error) {
 	// CPU
 	cpuResource, ok := resources["CPU"]
 	if ok {
@@ -174,7 +174,7 @@ func (h *HostResourceManager) consumable(resources map[string]ecs.Resource) (boo
 	return true, nil
 }
 
-func (h *HostResourceManager) release(taskArn string, resources map[string]ecs.Resource) {
+func (h *HostResourceManager) release(taskArn string, resources map[string]*ecs.Resource) {
 	h.hostResourceManagerRWLock.Lock()
 	defer h.hostResourceManagerRWLock.Unlock()
 	logger.Info("Release called with resources", logger.Fields{"resources": resources})

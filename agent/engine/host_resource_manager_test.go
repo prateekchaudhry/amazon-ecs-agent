@@ -5,6 +5,7 @@ import (
 
 	"github.com/aws/amazon-ecs-agent/agent/ecs_client/model/ecs"
 	"github.com/aws/amazon-ecs-agent/agent/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func getTestHostResourceManager(cpu int64, mem int64, ports []*string, portsUdp []*string, numGPUs int64) HostResourceManager {
@@ -24,13 +25,13 @@ func getTestHostResourceManager(cpu int64, mem int64, ports []*string, portsUdp 
 	hostResources["PORTS"] = &ecs.Resource{
 		Name:           utils.Strptr("PORTS"),
 		Type:           utils.Strptr("STRINGSET"),
-		StringSetValue: []*string{ports},
+		StringSetValue: ports,
 	}
 
 	hostResources["PORTS_UDP"] = &ecs.Resource{
 		Name:           utils.Strptr("PORTS_UDP"),
 		Type:           utils.Strptr("STRINGSET"),
-		StringSetValue: []*string{portsUdp},
+		StringSetValue: portsUdp,
 	}
 
 	hostResources["GPU"] = &ecs.Resource{
@@ -133,8 +134,8 @@ func TestConsumable(t *testing.T) {
 	testCases := []struct {
 		cpu           int64
 		mem           int64
-		ports         []string
-		portsUdp      []string
+		ports         []uint16
+		portsUdp      []uint16
 		gpus          int64
 		canBeConsumed bool
 	}{
