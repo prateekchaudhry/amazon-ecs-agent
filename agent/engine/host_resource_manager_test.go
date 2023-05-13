@@ -1,5 +1,12 @@
 package engine
 
+import (
+	"testing"
+
+	"github.com/aws/amazon-ecs-agent/agent/ecs_client/model/ecs"
+	"github.com/aws/amazon-ecs-agent/agent/utils"
+)
+
 func getTestHostResourceManager(cpu int64, mem int64, ports []*string, portsUdp []*string, numGPUs int64) HostResourceManager {
 	hostResources := make(map[string]*ecs.Resource)
 	hostResources["CPU"] = &ecs.Resource{
@@ -15,15 +22,15 @@ func getTestHostResourceManager(cpu int64, mem int64, ports []*string, portsUdp 
 	}
 
 	hostResources["PORTS"] = &ecs.Resource{
-		Name:         utils.Strptr("PORTS"),
-		Type:         utils.Strptr("STRINGSET"),
-		IntegerValue: []*string{ports},
+		Name:           utils.Strptr("PORTS"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: []*string{ports},
 	}
 
 	hostResources["PORTS_UDP"] = &ecs.Resource{
-		Name:         utils.Strptr("PORTS_UDP"),
-		Type:         utils.Strptr("STRINGSET"),
-		IntegerValue: []*string{portsUdp},
+		Name:           utils.Strptr("PORTS_UDP"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: []*string{portsUdp},
 	}
 
 	hostResources["GPU"] = &ecs.Resource{
@@ -32,7 +39,7 @@ func getTestHostResourceManager(cpu int64, mem int64, ports []*string, portsUdp 
 		IntegerValue: &numGPUs,
 	}
 
-	hostResourceManager := NewHostResourceManager(hostResources, numGPUs)
+	hostResourceManager := NewHostResourceManager(hostResources)
 
 	return hostResourceManager
 }
