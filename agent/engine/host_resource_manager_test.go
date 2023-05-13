@@ -189,7 +189,7 @@ func TestConsumable(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testcases {
+	for _, tc := range testCases {
 		resources := getTestTaskResourceMap(tc.cpu, tc.mem, utils.Uint16SliceToStringSlice(tc.ports), utils.Uint16SliceToStringSlice(tc.portsUdp), tc.gpus)
 		canBeConsumed := h.consumable(resources)
 		assert.Equal(t, canBeConsumed, tc.canBeConsumed, "Error in checking if resources can be successfully consumed")
