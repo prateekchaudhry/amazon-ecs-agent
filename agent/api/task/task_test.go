@@ -4886,11 +4886,9 @@ func TestToHostResources(t *testing.T) {
 	testTask3 := &Task{
 		Containers: []*apicontainer.Container{
 			{
-				CPU:    uint(1200),
-				Memory: uint(1200),
-				DockerConfig: apicontainer.DockerConfig{
-					HostConfig: strptr(string(dockercontainer.HostConfig{})),
-				},
+				CPU:          uint(1200),
+				Memory:       uint(1200),
+				DockerConfig: apicontainer.DockerConfig{},
 			},
 		},
 	}
