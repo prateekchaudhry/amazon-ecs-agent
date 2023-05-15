@@ -119,10 +119,10 @@ func TestHostResourceRelease(t *testing.T) {
 	assert.Equal(t, *h.consumedResource["CPU"].IntegerValue, int64(0), "Incorrect cpu resource accounting during release")
 	assert.Equal(t, *h.consumedResource["MEMORY"].IntegerValue, int64(0), "Incorrect memory resource accounting during release")
 	assert.Equal(t, *h.consumedResource["PORTS"].StringSetValue[0], "22", "Incorrect port resource accounting during release")
-	assert.Equal(t, len(h.consumedResource["PORTS"].StringSetValue), 0, "Incorrect port resource accounting during release")
+	assert.Equal(t, len(h.consumedResource["PORTS"].StringSetValue), 1, "Incorrect port resource accounting during release")
 	assert.Equal(t, *h.consumedResource["PORTS_UDP"].StringSetValue[0], "1000", "Incorrect udp port resource accounting during release")
-	assert.Equal(t, len(h.consumedResource["PORTS_UDP"].StringSetValue), 0, "Incorrect udp port resource accounting during release")
-	assert.Equal(t, *h.consumedResource["GPU"].IntegerValue, int64(4), "Incorrect gpu resource accounting during release")
+	assert.Equal(t, len(h.consumedResource["PORTS_UDP"].StringSetValue), 1, "Incorrect udp port resource accounting during release")
+	assert.Equal(t, *h.consumedResource["GPU"].IntegerValue, int64(0), "Incorrect gpu resource accounting during release")
 }
 
 func TestConsumable(t *testing.T) {
