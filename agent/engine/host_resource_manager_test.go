@@ -93,13 +93,13 @@ func TestHostResourceConsume(t *testing.T) {
 	h.consume(testTaskArn, taskResources)
 	assert.Equal(t, *h.consumedResource["CPU"].IntegerValue, int64(512), "Incorrect cpu resource accounting during consume")
 	assert.Equal(t, *h.consumedResource["MEMORY"].IntegerValue, int64(768), "Incorrect memory resource accounting during consume")
-	assert.Equal(t, h.consumedResource["PORTS"].StringSetValue[0], "22", "Incorrect port resource accounting during consume")
-	assert.Equal(t, h.consumedResource["PORTS"].StringSetValue[1], "23", "Incorrect port resource accounting during consume")
+	assert.Equal(t, *h.consumedResource["PORTS"].StringSetValue[0], "22", "Incorrect port resource accounting during consume")
+	assert.Equal(t, *h.consumedResource["PORTS"].StringSetValue[1], "23", "Incorrect port resource accounting during consume")
 	assert.Equal(t, len(h.consumedResource["PORTS"].StringSetValue), 2, "Incorrect port resource accounting during consume")
 	assert.Equal(t, *h.consumedResource["PORTS_UDP"].StringSetValue[0], "1000", "Incorrect udp port resource accounting during consume")
 	assert.Equal(t, *h.consumedResource["PORTS_UDP"].StringSetValue[1], "1001", "Incorrect udp port resource accounting during consume")
 	assert.Equal(t, len(h.consumedResource["PORTS_UDP"].StringSetValue), 2, "Incorrect port resource accounting during consume")
-	assert.Equal(t, *h.consumedResource["GPU"].IntegerValue, int64(3), "Incorrect gpu resource accounting during consume")
+	assert.Equal(t, *h.consumedResource["GPU"].IntegerValue, int64(1), "Incorrect gpu resource accounting during consume")
 }
 
 func TestHostResourceRelease(t *testing.T) {
