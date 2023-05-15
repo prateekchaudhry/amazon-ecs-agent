@@ -4802,3 +4802,203 @@ func TestInitializeAndGetCredentialSpecResource(t *testing.T) {
 	_, ok := task.GetCredentialSpecResource()
 	assert.True(t, ok)
 }
+
+func getTestTaskResourceMap(cpu int64, mem int64, ports []*string, portsUdp []*string, numGPUs int64) map[string]*ecs.Resource {
+	taskResources := make(map[string]*ecs.Resource)
+	taskResources["CPU"] = &ecs.Resource{
+		Name:         utils.Strptr("CPU"),
+		Type:         utils.Strptr("INTEGER"),
+		IntegerValue: &cpu,
+	}
+
+	taskResources["MEMORY"] = &ecs.Resource{
+		Name:         utils.Strptr("MEMORY"),
+		Type:         utils.Strptr("INTEGER"),
+		IntegerValue: &mem,
+	}
+
+	taskResources["PORTS"] = &ecs.Resource{
+		Name:           utils.Strptr("PORTS"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: ports,
+	}
+
+	taskResources["PORTS_UDP"] = &ecs.Resource{
+		Name:           utils.Strptr("PORTS_UDP"),
+		Type:           utils.Strptr("STRINGSET"),
+		StringSetValue: portsUdp,
+	}
+
+	taskResources["GPU"] = &ecs.Resource{
+		Name:         utils.Strptr("GPU"),
+		Type:         utils.Strptr("INTEGER"),
+		IntegerValue: &numGPUs,
+	}
+
+	return taskResources
+}
+
+func TestToHostResources(t *testing.T) {
+	// Prefer task level, and check gpu assignment
+	testTask1 := &Task{
+		CPU: 1.0,
+		Memory: int64(512),
+		Containers: []*apicontainer.Container{
+		{
+			CPU: uint(1200),
+			Memory: uint(1200),
+			DockerConfig: strptr(string(apicontainer.DockerConfig{
+				dockercontainer.HostConfig{
+					HostConfig: dockercontainer.HostConfig{
+						// 400 MiB
+						MemoryReservation: int64(419430400),
+					}
+				},
+			})),
+			GPUIDs: []string{"gpu1", "gpu2"},
+		},
+		},
+	}
+
+	// If task not set, use container level (MemoryReservation pref)
+	testTask2 := &Task{
+		Containers: []*apicontainer.Container{
+		{
+			CPU: uint(1200),
+			Memory: uint(1200),
+			DockerConfig: strptr(string(apicontainer.DockerConfig{
+				dockercontainer.HostConfig{
+					HostConfig: dockercontainer.HostConfig{
+						// 400 MiB
+						MemoryReservation: int64(419430400),
+					}
+				},
+			})),
+		},
+		},
+	}
+
+	// If task not set, if MemoryReservation not set, use container level hard limit (c.Memory)
+	testTask3 := &Task{
+		Containers: []*apicontainer.Container{
+		{
+			CPU: uint(1200),
+			Memory: uint(1200),
+			DockerConfig: strptr(string(apicontainer.DockerConfig{
+				dockercontainer.HostConfig{
+					HostConfig: dockercontainer.HostConfig{
+					}
+				},
+			})),
+		},
+		},
+	}
+
+	// Check ports
+	testTask4 := &Task{
+		CPU: 1.0,
+		Memory: int64(512),
+		Containers: []*apicontainer.Container{
+		{
+			CPU: uint(1200),
+			Memory: uintt(1200),
+			DockerConfig: strptr(string(apicontainer.DockerConfig{
+				dockercontainer.HostConfig{
+					HostConfig: dockercontainer.HostConfig{
+						// 400 MiB
+						MemoryReservation: int64(419430400),
+					}
+				},
+			})),
+			Ports: []apicontainer.PortBinding{
+				{
+					ContainerPort: 10,
+					HostPort:      10,
+					BindIP:        "",
+					Protocol:      apicontainer.TransportProtocolTCP,
+				},
+				{
+					ContainerPort: 20,
+					HostPort:      20,
+					BindIP:        "",
+					Protocol:      apicontainer.TransportProtocolUDP,
+				},
+				{
+					ContainerPortRange: "99-999",
+					BindIP:             "",
+					Protocol:           apicontainer.TransportProtocolTCP,
+				},
+				{
+					ContainerPortRange: "121-221",
+					BindIP:             "",
+					Protocol:           apicontainer.TransportProtocolUDP,
+				},
+			},
+		},
+		},
+	}
+
+	portTCP1 := "10"
+	portUDP1 := "20"
+
+	testCases := []struct {
+		task Task
+		expectedResource map[string]*ecs.Resource
+	}{
+		{
+			task: testTask1,
+			expectedResources: getTestTaskResourceMap(int64(1024), int64(512), []*string{}, []*string{}, int64(2)),
+		},
+		{
+			task: testTask2,
+			expectedResources: getTestTaskResourceMap(int64(1200), int64(400), []*string{}, []*string{}, int64(0)),
+		},
+		{
+			task: testTask3,
+			expectedResources: getTestTaskResourceMap(int64(1200), int64(1200), []*string{}, []*string{}, int64(0)),
+		},
+		{
+			task: testTask4,
+			expectedResources: getTestTaskResourceMap(int64(1024), int64(512), []*string{&portTCP1}, []*string{&portUDP1}, int64(0)),
+		},
+	}
+
+	for _, tc := range testCases {
+		calcResources := tc.task.ToHostResources()
+
+		//CPU
+		assert.Equal(t, tc.expectedResource["CPU"].IntegerValue, calcResources["CPU"].IntegerValue, "Error converting task CPU tesources")
+
+		//MEMORY
+		assert.Equal(t, tc.expectedResource["MEMORY"].IntegerValue, calcResources["MEMORY"].IntegerValue, "Error converting task Memory tesources")
+
+		//GPU
+		assert.Equal(t, tc.expectedResource["GPU"].IntegerValue, calcResources["GPU"].IntegerValue, "Error converting task GPU tesources")
+
+		//PORTS
+		assert.Equal(t, len(tc.expectedResource["PORTS"].StringSetValue), calcResources["PORTS"].StringSetValue, "Error converting task TCP port tesources")
+		for _, expectedPort := range tc.expectedResource["PORTS"].StringSetValue {
+			found := false
+			for _, calcPort := range calcResources["PORTS"].StringSetValue {
+				if *expectedPort == *calcPort {
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, "Could not convert TCP port resources")
+		}
+
+		//PORTS
+		assert.Equal(t, len(tc.expectedResource["PORTS_UDP"].StringSetValue), calcResources["PORTS_UDP"].StringSetValue, "Error converting task UDP port tesources")
+		for _, expectedPort := range tc.expectedResource["PORTS_UDP"].StringSetValue {
+			found := false
+			for _, calcPort := range calcResources["PORTS_UDP"].StringSetValue {
+				if *expectedPort == *calcPort {
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, "Could not convert UDP port resources")
+		}
+	}
+}

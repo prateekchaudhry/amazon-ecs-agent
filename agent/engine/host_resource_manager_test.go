@@ -66,7 +66,7 @@ func getTestTaskResourceMap(cpu int64, mem int64, ports []*string, portsUdp []*s
 	}
 
 	taskResources["PORTS_UDP"] = &ecs.Resource{
-		Name:           utils.Strptr("PORTS"),
+		Name:           utils.Strptr("PORTS_UDP"),
 		Type:           utils.Strptr("STRINGSET"),
 		StringSetValue: portsUdp,
 	}

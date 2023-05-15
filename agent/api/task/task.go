@@ -3625,7 +3625,7 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 	}
 	logger.Info("PORTS_UDP", logger.Fields{"UDP ports": udpPortSet})
 	resources["PORTS_UDP"] = &ecs.Resource{
-		Name:           utils.Strptr("PORTS"),
+		Name:           utils.Strptr("PORTS_UDP"),
 		Type:           utils.Strptr("STRINGSET"),
 		StringSetValue: utils.Uint16SliceToStringSlice(udpPortSet),
 	}
