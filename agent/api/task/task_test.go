@@ -45,6 +45,7 @@ import (
 	"github.com/aws/amazon-ecs-agent/agent/dockerclient"
 	"github.com/aws/amazon-ecs-agent/agent/dockerclient/dockerapi"
 	mock_dockerapi "github.com/aws/amazon-ecs-agent/agent/dockerclient/dockerapi/mocks"
+	"github.com/aws/amazon-ecs-agent/agent/ecs_client/model/ecs"
 	mock_s3_factory "github.com/aws/amazon-ecs-agent/agent/s3/factory/mocks"
 	mock_ssm_factory "github.com/aws/amazon-ecs-agent/agent/ssm/factory/mocks"
 	"github.com/aws/amazon-ecs-agent/agent/taskresource"
@@ -4847,14 +4848,13 @@ func TestToHostResources(t *testing.T) {
 			{
 				CPU:    uint(1200),
 				Memory: uint(1200),
-				DockerConfig: strptr(string(apicontainer.DockerConfig{
-					dockercontainer.HostConfig{
-						HostConfig: dockercontainer.HostConfig{
+				DockerConfig: apicontainer.DockerConfig{
+					HostConfig: strptr(string(dockercontainer.HostConfig{
 							// 400 MiB
 							MemoryReservation: int64(419430400),
-						},
+						})),
 					},
-				})),
+				},
 				GPUIDs: []string{"gpu1", "gpu2"},
 			},
 		},
@@ -4866,14 +4866,13 @@ func TestToHostResources(t *testing.T) {
 			{
 				CPU:    uint(1200),
 				Memory: uint(1200),
-				DockerConfig: strptr(string(apicontainer.DockerConfig{
-					dockercontainer.HostConfig{
-						HostConfig: dockercontainer.HostConfig{
+				DockerConfig: apicontainer.DockerConfig{
+					HostConfig: strptr(string(dockercontainer.HostConfig{
 							// 400 MiB
 							MemoryReservation: int64(419430400),
-						},
+						})),
 					},
-				})),
+				},
 			},
 		},
 	}
@@ -4884,11 +4883,10 @@ func TestToHostResources(t *testing.T) {
 			{
 				CPU:    uint(1200),
 				Memory: uint(1200),
-				DockerConfig: strptr(string(apicontainer.DockerConfig{
-					dockercontainer.HostConfig{
-						HostConfig: dockercontainer.HostConfig{},
+				DockerConfig: apicontainer.DockerConfig{
+						HostConfig: strptr(string(dockercontainer.HostConfig{})),
 					},
-				})),
+				},
 			},
 		},
 	}
@@ -4901,14 +4899,13 @@ func TestToHostResources(t *testing.T) {
 			{
 				CPU:    uint(1200),
 				Memory: uintt(1200),
-				DockerConfig: strptr(string(apicontainer.DockerConfig{
-					dockercontainer.HostConfig{
-						HostConfig: dockercontainer.HostConfig{
+				DockerConfig: apicontainer.DockerConfig{
+						HostConfig: strptr(string(dockercontainer.HostConfig{
 							// 400 MiB
 							MemoryReservation: int64(419430400),
-						},
+						})),
 					},
-				})),
+				},
 				Ports: []apicontainer.PortBinding{
 					{
 						ContainerPort: 10,
@@ -4987,7 +4984,7 @@ func TestToHostResources(t *testing.T) {
 			assert.True(t, found, "Could not convert TCP port resources")
 		}
 
-		//PORTS
+		//PORTS_UDP
 		assert.Equal(t, len(tc.expectedResource["PORTS_UDP"].StringSetValue), calcResources["PORTS_UDP"].StringSetValue, "Error converting task UDP port tesources")
 		for _, expectedPort := range tc.expectedResource["PORTS_UDP"].StringSetValue {
 			found := false
