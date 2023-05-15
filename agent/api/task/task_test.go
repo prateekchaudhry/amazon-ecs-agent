@@ -4848,7 +4848,7 @@ func TestToHostResources(t *testing.T) {
 		},
 	}
 
-	rawHostConfig, err := := json.Marshal(&hostConfig)
+	rawHostConfig, err := json.Marshal(&hostConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4902,7 +4902,7 @@ func TestToHostResources(t *testing.T) {
 		Containers: []*apicontainer.Container{
 			{
 				CPU:    uint(1200),
-				Memory: uintt(1200),
+				Memory: uint(1200),
 				DockerConfig: apicontainer.DockerConfig{
 					HostConfig: strptr(string(rawHostConfig)),
 				},
@@ -4938,8 +4938,8 @@ func TestToHostResources(t *testing.T) {
 	portUDP1 := "20"
 
 	testCases := []struct {
-		task             Task
-		expectedResource map[string]*ecs.Resource
+		task              *Task
+		expectedResources map[string]*ecs.Resource
 	}{
 		{
 			task:              testTask1,
@@ -4963,17 +4963,17 @@ func TestToHostResources(t *testing.T) {
 		calcResources := tc.task.ToHostResources()
 
 		//CPU
-		assert.Equal(t, tc.expectedResource["CPU"].IntegerValue, calcResources["CPU"].IntegerValue, "Error converting task CPU tesources")
+		assert.Equal(t, tc.expectedResources["CPU"].IntegerValue, calcResources["CPU"].IntegerValue, "Error converting task CPU tesources")
 
 		//MEMORY
-		assert.Equal(t, tc.expectedResource["MEMORY"].IntegerValue, calcResources["MEMORY"].IntegerValue, "Error converting task Memory tesources")
+		assert.Equal(t, tc.expectedResources["MEMORY"].IntegerValue, calcResources["MEMORY"].IntegerValue, "Error converting task Memory tesources")
 
 		//GPU
-		assert.Equal(t, tc.expectedResource["GPU"].IntegerValue, calcResources["GPU"].IntegerValue, "Error converting task GPU tesources")
+		assert.Equal(t, tc.expectedResources["GPU"].IntegerValue, calcResources["GPU"].IntegerValue, "Error converting task GPU tesources")
 
 		//PORTS
-		assert.Equal(t, len(tc.expectedResource["PORTS"].StringSetValue), calcResources["PORTS"].StringSetValue, "Error converting task TCP port tesources")
-		for _, expectedPort := range tc.expectedResource["PORTS"].StringSetValue {
+		assert.Equal(t, len(tc.expectedResources["PORTS"].StringSetValue), calcResources["PORTS"].StringSetValue, "Error converting task TCP port tesources")
+		for _, expectedPort := range tc.expectedResources["PORTS"].StringSetValue {
 			found := false
 			for _, calcPort := range calcResources["PORTS"].StringSetValue {
 				if *expectedPort == *calcPort {
@@ -4985,8 +4985,8 @@ func TestToHostResources(t *testing.T) {
 		}
 
 		//PORTS_UDP
-		assert.Equal(t, len(tc.expectedResource["PORTS_UDP"].StringSetValue), calcResources["PORTS_UDP"].StringSetValue, "Error converting task UDP port tesources")
-		for _, expectedPort := range tc.expectedResource["PORTS_UDP"].StringSetValue {
+		assert.Equal(t, len(tc.expectedResources["PORTS_UDP"].StringSetValue), calcResources["PORTS_UDP"].StringSetValue, "Error converting task UDP port tesources")
+		for _, expectedPort := range tc.expectedResources["PORTS_UDP"].StringSetValue {
 			found := false
 			for _, calcPort := range calcResources["PORTS_UDP"].StringSetValue {
 				if *expectedPort == *calcPort {
