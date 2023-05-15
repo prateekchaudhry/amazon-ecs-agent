@@ -4841,100 +4841,99 @@ func getTestTaskResourceMap(cpu int64, mem int64, ports []*string, portsUdp []*s
 func TestToHostResources(t *testing.T) {
 	// Prefer task level, and check gpu assignment
 	testTask1 := &Task{
-		CPU: 1.0,
+		CPU:    1.0,
 		Memory: int64(512),
 		Containers: []*apicontainer.Container{
-		{
-			CPU: uint(1200),
-			Memory: uint(1200),
-			DockerConfig: strptr(string(apicontainer.DockerConfig{
-				dockercontainer.HostConfig{
-					HostConfig: dockercontainer.HostConfig{
-						// 400 MiB
-						MemoryReservation: int64(419430400),
-					}
-				},
-			})),
-			GPUIDs: []string{"gpu1", "gpu2"},
-		},
+			{
+				CPU:    uint(1200),
+				Memory: uint(1200),
+				DockerConfig: strptr(string(apicontainer.DockerConfig{
+					dockercontainer.HostConfig{
+						HostConfig: dockercontainer.HostConfig{
+							// 400 MiB
+							MemoryReservation: int64(419430400),
+						},
+					},
+				})),
+				GPUIDs: []string{"gpu1", "gpu2"},
+			},
 		},
 	}
 
 	// If task not set, use container level (MemoryReservation pref)
 	testTask2 := &Task{
 		Containers: []*apicontainer.Container{
-		{
-			CPU: uint(1200),
-			Memory: uint(1200),
-			DockerConfig: strptr(string(apicontainer.DockerConfig{
-				dockercontainer.HostConfig{
-					HostConfig: dockercontainer.HostConfig{
-						// 400 MiB
-						MemoryReservation: int64(419430400),
-					}
-				},
-			})),
-		},
+			{
+				CPU:    uint(1200),
+				Memory: uint(1200),
+				DockerConfig: strptr(string(apicontainer.DockerConfig{
+					dockercontainer.HostConfig{
+						HostConfig: dockercontainer.HostConfig{
+							// 400 MiB
+							MemoryReservation: int64(419430400),
+						},
+					},
+				})),
+			},
 		},
 	}
 
 	// If task not set, if MemoryReservation not set, use container level hard limit (c.Memory)
 	testTask3 := &Task{
 		Containers: []*apicontainer.Container{
-		{
-			CPU: uint(1200),
-			Memory: uint(1200),
-			DockerConfig: strptr(string(apicontainer.DockerConfig{
-				dockercontainer.HostConfig{
-					HostConfig: dockercontainer.HostConfig{
-					}
-				},
-			})),
-		},
+			{
+				CPU:    uint(1200),
+				Memory: uint(1200),
+				DockerConfig: strptr(string(apicontainer.DockerConfig{
+					dockercontainer.HostConfig{
+						HostConfig: dockercontainer.HostConfig{},
+					},
+				})),
+			},
 		},
 	}
 
 	// Check ports
 	testTask4 := &Task{
-		CPU: 1.0,
+		CPU:    1.0,
 		Memory: int64(512),
 		Containers: []*apicontainer.Container{
-		{
-			CPU: uint(1200),
-			Memory: uintt(1200),
-			DockerConfig: strptr(string(apicontainer.DockerConfig{
-				dockercontainer.HostConfig{
-					HostConfig: dockercontainer.HostConfig{
-						// 400 MiB
-						MemoryReservation: int64(419430400),
-					}
-				},
-			})),
-			Ports: []apicontainer.PortBinding{
-				{
-					ContainerPort: 10,
-					HostPort:      10,
-					BindIP:        "",
-					Protocol:      apicontainer.TransportProtocolTCP,
-				},
-				{
-					ContainerPort: 20,
-					HostPort:      20,
-					BindIP:        "",
-					Protocol:      apicontainer.TransportProtocolUDP,
-				},
-				{
-					ContainerPortRange: "99-999",
-					BindIP:             "",
-					Protocol:           apicontainer.TransportProtocolTCP,
-				},
-				{
-					ContainerPortRange: "121-221",
-					BindIP:             "",
-					Protocol:           apicontainer.TransportProtocolUDP,
+			{
+				CPU:    uint(1200),
+				Memory: uintt(1200),
+				DockerConfig: strptr(string(apicontainer.DockerConfig{
+					dockercontainer.HostConfig{
+						HostConfig: dockercontainer.HostConfig{
+							// 400 MiB
+							MemoryReservation: int64(419430400),
+						},
+					},
+				})),
+				Ports: []apicontainer.PortBinding{
+					{
+						ContainerPort: 10,
+						HostPort:      10,
+						BindIP:        "",
+						Protocol:      apicontainer.TransportProtocolTCP,
+					},
+					{
+						ContainerPort: 20,
+						HostPort:      20,
+						BindIP:        "",
+						Protocol:      apicontainer.TransportProtocolUDP,
+					},
+					{
+						ContainerPortRange: "99-999",
+						BindIP:             "",
+						Protocol:           apicontainer.TransportProtocolTCP,
+					},
+					{
+						ContainerPortRange: "121-221",
+						BindIP:             "",
+						Protocol:           apicontainer.TransportProtocolUDP,
+					},
 				},
 			},
-		},
 		},
 	}
 
@@ -4942,23 +4941,23 @@ func TestToHostResources(t *testing.T) {
 	portUDP1 := "20"
 
 	testCases := []struct {
-		task Task
+		task             Task
 		expectedResource map[string]*ecs.Resource
 	}{
 		{
-			task: testTask1,
+			task:              testTask1,
 			expectedResources: getTestTaskResourceMap(int64(1024), int64(512), []*string{}, []*string{}, int64(2)),
 		},
 		{
-			task: testTask2,
+			task:              testTask2,
 			expectedResources: getTestTaskResourceMap(int64(1200), int64(400), []*string{}, []*string{}, int64(0)),
 		},
 		{
-			task: testTask3,
+			task:              testTask3,
 			expectedResources: getTestTaskResourceMap(int64(1200), int64(1200), []*string{}, []*string{}, int64(0)),
 		},
 		{
-			task: testTask4,
+			task:              testTask4,
 			expectedResources: getTestTaskResourceMap(int64(1024), int64(512), []*string{&portTCP1}, []*string{&portUDP1}, int64(0)),
 		},
 	}
