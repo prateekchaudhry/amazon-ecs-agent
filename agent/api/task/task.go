@@ -3588,13 +3588,15 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 
 	// PORTS
 	var tcpPortSet []uint16
-	for _, c := range task.Containers {
-		for _, port := range c.Ports {
-			// TODO: Should check what happens in case of dynamic port mapping
-			hostPort := port.HostPort
-			protocol := port.Protocol
-			if hostPort > 0 && protocol == container.TransportProtocolTCP {
-				tcpPortSet = append(tcpPortSet, hostPort)
+	// AWSVPC tasks have 'host' ports mapped to task ENI, not to host
+	if !task.IsNetworkModeAWSVPC() {
+		for _, c := range task.Containers {
+			for _, port := range c.Ports {
+				hostPort := port.HostPort
+				protocol := port.Protocol
+				if hostPort > 0 && protocol == container.TransportProtocolTCP {
+					tcpPortSet = append(tcpPortSet, hostPort)
+				}
 			}
 		}
 	}
@@ -3606,12 +3608,14 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 
 	// PORTS_UDP
 	var udpPortSet []uint16
-	for _, c := range task.Containers {
-		for _, port := range c.Ports {
-			hostPort := port.HostPort
-			protocol := port.Protocol
-			if hostPort > 0 && protocol == container.TransportProtocolUDP {
-				udpPortSet = append(udpPortSet, hostPort)
+	if !task.IsNetworkModeAWSVPC() {
+		for _, c := range task.Containers {
+			for _, port := range c.Ports {
+				hostPort := port.HostPort
+				protocol := port.Protocol
+				if hostPort > 0 && protocol == container.TransportProtocolUDP {
+					udpPortSet = append(udpPortSet, hostPort)
+				}
 			}
 		}
 	}
