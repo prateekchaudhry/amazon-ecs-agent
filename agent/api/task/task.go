@@ -3527,7 +3527,7 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 	// CPU
 	if task.CPU > 0 {
 		// cpu unit is vcpu at task level
-		// Converting to cpushares
+		// convert to cpushares
 		taskCPUint64 := int64(task.CPU * 1024)
 		logger.Info("Sourcing CPU from task level", logger.Fields{"CPU": taskCPUint64})
 		resources["CPU"] = &ecs.Resource{
@@ -3536,7 +3536,7 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 			IntegerValue: &taskCPUint64,
 		}
 	} else {
-		// cpu unit is cpushares at container level, keeping as is
+		// cpu unit is cpushares at container level
 		containerCPUint64 := int64(0)
 		for _, container := range task.Containers {
 			containerCPUint64 += int64(container.CPU)
@@ -3602,6 +3602,8 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 			protocol := port.Protocol
 			if protocol == container.TransportProtocolTCP {
 				tcpPortSet = append(tcpPortSet, hostPort)
+
+				logger.Info("Appendinggg PORTS", logger.Fields{"TCP ports": tcpPortSet})
 			}
 		}
 	}
