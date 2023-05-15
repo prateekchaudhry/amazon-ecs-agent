@@ -90,7 +90,7 @@ func TestHostResourceConsumeSuccess(t *testing.T) {
 	taskPort2 := "1001"
 	taskResources := getTestTaskResourceMap(int64(512), int64(768), []*string{&taskPort1}, []*string{&taskPort2}, 1)
 
-	consumed := h.consume(testTaskArn, taskResources)
+	consumed, _ := h.consume(testTaskArn, taskResources)
 	assert.Equal(t, consumed, true, "Incorrect consumed status")
 	assert.Equal(t, *h.consumedResource["CPU"].IntegerValue, int64(512), "Incorrect cpu resource accounting during consume")
 	assert.Equal(t, *h.consumedResource["MEMORY"].IntegerValue, int64(768), "Incorrect memory resource accounting during consume")
@@ -113,7 +113,7 @@ func TestHostResourceConsumeFail(t *testing.T) {
 	taskPort2 := "1001"
 	taskResources := getTestTaskResourceMap(int64(512), int64(768), []*string{&taskPort1}, []*string{&taskPort2}, 1)
 
-	consumed := h.consume(testTaskArn, taskResources)
+	consumed, _ := h.consume(testTaskArn, taskResources)
 	assert.Equal(t, consumed, false, "Incorrect consumed status")
 	assert.Equal(t, *h.consumedResource["CPU"].IntegerValue, int64(0), "Incorrect cpu resource accounting during consume")
 	assert.Equal(t, *h.consumedResource["MEMORY"].IntegerValue, int64(0), "Incorrect memory resource accounting during consume")
