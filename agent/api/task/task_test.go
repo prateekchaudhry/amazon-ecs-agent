@@ -4840,6 +4840,19 @@ func getTestTaskResourceMap(cpu int64, mem int64, ports []*string, portsUdp []*s
 }
 
 func TestToHostResources(t *testing.T) {
+	//Prepare a simple hostConfig with memory reservation field for test cases
+	hostConfig := dockercontainer.HostConfig{
+		// 400 MiB
+		Resources: dockercontainer.Resources{
+			MemoryReservation: int64(419430400),
+		},
+	}
+
+	rawHostConfig, err := := json.Marshal(&hostConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Prefer task level, and check gpu assignment
 	testTask1 := &Task{
 		CPU:    1.0,
@@ -4849,12 +4862,7 @@ func TestToHostResources(t *testing.T) {
 				CPU:    uint(1200),
 				Memory: uint(1200),
 				DockerConfig: apicontainer.DockerConfig{
-					HostConfig: strptr(string(dockercontainer.HostConfig{
-						// 400 MiB
-						Resources: dockercontainer.Resources{
-							MemoryReservation: int64(419430400),
-						},
-					})),
+					HostConfig: strptr(string(rawHostConfig)),
 				},
 				GPUIDs: []string{"gpu1", "gpu2"},
 			},
@@ -4868,12 +4876,7 @@ func TestToHostResources(t *testing.T) {
 				CPU:    uint(1200),
 				Memory: uint(1200),
 				DockerConfig: apicontainer.DockerConfig{
-					HostConfig: strptr(string(dockercontainer.HostConfig{
-						// 400 MiB
-						Resources: dockercontainer.Resources{
-							MemoryReservation: int64(419430400),
-						},
-					})),
+					HostConfig: strptr(string(rawHostConfig)),
 				},
 			},
 		},
@@ -4901,12 +4904,7 @@ func TestToHostResources(t *testing.T) {
 				CPU:    uint(1200),
 				Memory: uintt(1200),
 				DockerConfig: apicontainer.DockerConfig{
-					HostConfig: strptr(string(dockercontainer.HostConfig{
-						// 400 MiB
-						Resources: dockercontainer.Resources{
-							MemoryReservation: int64(419430400),
-						},
-					})),
+					HostConfig: strptr(string(rawHostConfig)),
 				},
 				Ports: []apicontainer.PortBinding{
 					{
