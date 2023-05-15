@@ -93,7 +93,7 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]*ecs.
 		}
 
 		// GPU
-		*h.hostResource["GPU"].IntegerValue += *resources["GPU"].IntegerValue
+		*h.consumedResource["GPU"].IntegerValue += *resources["GPU"].IntegerValue
 
 		// Set consumed status
 		h.taskConsumed[taskArn] = true
