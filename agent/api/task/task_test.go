@@ -4883,7 +4883,6 @@ func TestToHostResources(t *testing.T) {
 				Memory: uint(1200),
 				DockerConfig: apicontainer.DockerConfig{
 						HostConfig: strptr(string(dockercontainer.HostConfig{})),
-					},
 				},
 			},
 		},
