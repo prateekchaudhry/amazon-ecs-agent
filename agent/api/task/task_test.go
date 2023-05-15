@@ -4851,7 +4851,7 @@ func TestToHostResources(t *testing.T) {
 				DockerConfig: apicontainer.DockerConfig{
 					HostConfig: strptr(string(dockercontainer.HostConfig{
 						// 400 MiB
-						MemoryReservation: int64(419430400),
+						Resources.MemoryReservation: int64(419430400),
 					})),
 				},
 				GPUIDs: []string{"gpu1", "gpu2"},
@@ -4868,7 +4868,7 @@ func TestToHostResources(t *testing.T) {
 				DockerConfig: apicontainer.DockerConfig{
 					HostConfig: strptr(string(dockercontainer.HostConfig{
 						// 400 MiB
-						MemoryReservation: int64(419430400),
+						Resources.MemoryReservation: int64(419430400),
 					})),
 				},
 			},
@@ -4899,7 +4899,7 @@ func TestToHostResources(t *testing.T) {
 				DockerConfig: apicontainer.DockerConfig{
 					HostConfig: strptr(string(dockercontainer.HostConfig{
 						// 400 MiB
-						MemoryReservation: int64(419430400),
+						Resources.MemoryReservation: int64(419430400),
 					})),
 				},
 				Ports: []apicontainer.PortBinding{
