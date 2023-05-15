@@ -3529,7 +3529,6 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 		// cpu unit is vcpu at task level
 		// convert to cpushares
 		taskCPUint64 := int64(task.CPU * 1024)
-		logger.Info("Sourcing CPU from task level", logger.Fields{"CPU": taskCPUint64})
 		resources["CPU"] = &ecs.Resource{
 			Name:         utils.Strptr("CPU"),
 			Type:         utils.Strptr("INTEGER"),
@@ -3546,14 +3545,12 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 			Type:         utils.Strptr("INTEGER"),
 			IntegerValue: &containerCPUint64,
 		}
-		logger.Info("Sourcing CPU from container level", logger.Fields{"CPU": containerCPUint64})
 	}
 
 	// Memory
 	if task.Memory > 0 {
 		// memory unit is MiB at task level
 		taskMEMint64 := task.Memory
-		logger.Info("Sourcing MEMORY from TASK level", logger.Fields{"MEMORY": taskMEMint64})
 		resources["MEMORY"] = &ecs.Resource{
 			Name:         utils.Strptr("MEMORY"),
 			Type:         utils.Strptr("INTEGER"),
@@ -3569,23 +3566,19 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 				if c.DockerConfig.HostConfig != nil {
 					err := json.Unmarshal([]byte(*c.DockerConfig.HostConfig), hostConfig)
 					if err != nil || hostConfig.MemoryReservation <= 0 {
-						logger.Info("Defaulting to container level memory")
 						// container memory unit is MiB, keeping as is
 						containerMEMint64 += int64(c.Memory)
 					} else {
-						logger.Info("Sourcing memory resource from hostConfig.MemoryReservation")
 						// Soft limit is specified in MiB units but translated to bytes while being transferred to Agent
 						// Converting back to MiB
 						containerMEMint64 += hostConfig.MemoryReservation / (1024 * 1024)
 					}
 				}
 			} else {
-				logger.Info("Sourcing memory resource from hostConfig.MemoryReservation")
 				// container memory unit is MiB, keeping as is
 				containerMEMint64 += int64(c.Memory)
 			}
 		}
-		logger.Info("MEMORY", logger.Fields{"MEMORY": containerMEMint64})
 		resources["MEMORY"] = &ecs.Resource{
 			Name:         utils.Strptr("MEMORY"),
 			Type:         utils.Strptr("INTEGER"),
@@ -3605,7 +3598,6 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 			}
 		}
 	}
-	logger.Info("PORTS", logger.Fields{"TCP ports": tcpPortSet})
 	resources["PORTS"] = &ecs.Resource{
 		Name:           utils.Strptr("PORTS"),
 		Type:           utils.Strptr("STRINGSET"),
@@ -3623,7 +3615,6 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 			}
 		}
 	}
-	logger.Info("PORTS_UDP", logger.Fields{"UDP ports": udpPortSet})
 	resources["PORTS_UDP"] = &ecs.Resource{
 		Name:           utils.Strptr("PORTS_UDP"),
 		Type:           utils.Strptr("STRINGSET"),
@@ -3641,5 +3632,6 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 		Type:         utils.Strptr("INTEGER"),
 		IntegerValue: &num_gpus,
 	}
+	logger.Debug("Task host resources to account for", logger.Fields{"taskArn": task.Arn, "CPU": *resources["CPU"].IntegerValue, "MEMORY": *resources["MEMORY"].IntegerValue, "TCP ports": tcpPortSet, "UDP ports": udpPortSet, "GPU": num_gpus})
 	return resources
 }
