@@ -4932,8 +4932,8 @@ func TestToHostResources(t *testing.T) {
 		},
 	}
 
-	portTCP1 := "10"
-	portUDP1 := "20"
+	portsTCP := []uint16{10}
+	portsUDP := []uint16{20}
 
 	testCases := []struct {
 		task              *Task
@@ -4953,7 +4953,7 @@ func TestToHostResources(t *testing.T) {
 		},
 		{
 			task:              testTask4,
-			expectedResources: getTestTaskResourceMap(int64(1024), int64(512), []*string{&portTCP1}, []*string{&portUDP1}, int64(0)),
+			expectedResources: getTestTaskResourceMap(int64(1024), int64(512), utils.Uint16SliceToStringSlice(portsTCP), utils.Uint16SliceToStringSlice(portsUDP), int64(0)),
 		},
 	}
 
