@@ -3600,10 +3600,8 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 			// TODO: Should check what happens in case of dynamic port mapping
 			hostPort := port.HostPort
 			protocol := port.Protocol
-			if protocol == container.TransportProtocolTCP {
+			if hostPort > 0 && protocol == container.TransportProtocolTCP {
 				tcpPortSet = append(tcpPortSet, hostPort)
-
-				logger.Info("Appendinggg PORTS", logger.Fields{"TCP ports": tcpPortSet})
 			}
 		}
 	}
@@ -3620,7 +3618,7 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 		for _, port := range c.Ports {
 			hostPort := port.HostPort
 			protocol := port.Protocol
-			if protocol == container.TransportProtocolUDP {
+			if hostPort > 0 && protocol == container.TransportProtocolUDP {
 				udpPortSet = append(udpPortSet, hostPort)
 			}
 		}
