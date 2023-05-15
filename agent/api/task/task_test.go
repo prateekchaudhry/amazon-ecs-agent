@@ -4853,7 +4853,6 @@ func TestToHostResources(t *testing.T) {
 							// 400 MiB
 							MemoryReservation: int64(419430400),
 						})),
-					},
 				},
 				GPUIDs: []string{"gpu1", "gpu2"},
 			},
@@ -4871,7 +4870,6 @@ func TestToHostResources(t *testing.T) {
 							// 400 MiB
 							MemoryReservation: int64(419430400),
 						})),
-					},
 				},
 			},
 		},
