@@ -173,7 +173,7 @@ func (h *HostResourceManager) consumable(resources map[string]*ecs.Resource) (bo
 func (h *HostResourceManager) release(taskArn string, resources map[string]*ecs.Resource) {
 	h.hostResourceManagerRWLock.Lock()
 	defer h.hostResourceManagerRWLock.Unlock()
-	defer logger.Debug("Consumed resources after task consume call", logger.Fields{
+	defer logger.Debug("Consumed resources after task release call", logger.Fields{
 		"taskArn":   taskArn,
 		"CPU":       *h.consumedResource["CPU"].IntegerValue,
 		"MEMORY":    *h.consumedResource["MEMORY"].IntegerValue,
