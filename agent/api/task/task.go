@@ -3636,6 +3636,13 @@ func (task *Task) ToHostResources() map[string]*ecs.Resource {
 		Type:         utils.Strptr("INTEGER"),
 		IntegerValue: &num_gpus,
 	}
-	logger.Debug("Task host resources to account for", logger.Fields{"taskArn": task.Arn, "CPU": *resources["CPU"].IntegerValue, "MEMORY": *resources["MEMORY"].IntegerValue, "TCP ports": tcpPortSet, "UDP ports": udpPortSet, "GPU": num_gpus})
+	logger.Debug("Task host resources to account for", logger.Fields{
+		"taskArn":   task.Arn,
+		"CPU":       *resources["CPU"].IntegerValue,
+		"MEMORY":    *resources["MEMORY"].IntegerValue,
+		"PORTS":     resources["PORTS"].StringSetValue,
+		"PORTS_UDP": resources["PORTS_UDP"].StringSetValue,
+		"GPU":       num_gpus,
+	})
 	return resources
 }

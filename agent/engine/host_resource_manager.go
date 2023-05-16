@@ -42,9 +42,14 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]*ecs.
 	h.hostResourceManagerRWLock.Lock()
 	defer h.hostResourceManagerRWLock.Unlock()
 
-	logger.Info("Consume called with resources", logger.Fields{"resources": resources})
-	logger.Info("Consume called", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource, "h.taskConsumed": h.taskConsumed})
-	defer logger.Info("Consume done", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource, "h.taskConsumed": h.taskConsumed})
+	defer logger.Debug("Consumed resources after task consume call", logger.Fields{
+		"taskArn":   taskArn,
+		"CPU":       *h.consumedResource["CPU"].IntegerValue,
+		"MEMORY":    *h.consumedResource["MEMORY"].IntegerValue,
+		"PORTS":     h.consumedResource["PORTS"].StringSetValue,
+		"PORTS_UDP": h.consumedResource["PORTS_UDP"].StringSetValue,
+		"GPU":       *h.consumedResource["GPU"].IntegerValue,
+	})
 
 	// Check if already consumed
 	_, ok := h.consumedResource[taskArn]
@@ -55,7 +60,6 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]*ecs.
 
 	ok, err := h.consumable(resources)
 	if err != nil {
-		logger.Info("Consume error")
 		return false, err
 	}
 	if ok {
@@ -97,10 +101,8 @@ func (h *HostResourceManager) consume(taskArn string, resources map[string]*ecs.
 
 		// Set consumed status
 		h.taskConsumed[taskArn] = true
-		logger.Info("Consume true okay")
 		return true, nil
 	}
-	logger.Info("Consume false okay")
 	return false, nil
 }
 
@@ -112,7 +114,6 @@ func (h *HostResourceManager) consumable(resources map[string]*ecs.Resource) (bo
 	cpuResource, ok := resources["CPU"]
 	if ok {
 		if *(h.hostResource["CPU"].IntegerValue) < *(h.consumedResource["CPU"].IntegerValue)+*(cpuResource.IntegerValue) {
-			logger.Info("Unable to consume CPU")
 			return false, nil
 		}
 	} else {
@@ -123,7 +124,6 @@ func (h *HostResourceManager) consumable(resources map[string]*ecs.Resource) (bo
 	memResource, ok := resources["MEMORY"]
 	if ok {
 		if *(h.hostResource["MEMORY"].IntegerValue) < *(h.consumedResource["MEMORY"].IntegerValue)+*(memResource.IntegerValue) {
-			logger.Info("Unable to consume MEMORY")
 			return false, nil
 		}
 	} else {
@@ -141,7 +141,6 @@ func (h *HostResourceManager) consumable(resources map[string]*ecs.Resource) (bo
 			for _, consumedPort := range h.consumedResource["PORTS"].StringSetValue {
 				// If port is already reserved by some other task, this 'resources' object can not be consumed
 				if *port == *consumedPort {
-					logger.Info("Unable to consume PORTS")
 					return false, nil
 				}
 			}
@@ -156,7 +155,6 @@ func (h *HostResourceManager) consumable(resources map[string]*ecs.Resource) (bo
 		for _, port := range taskPortsUDPSlice {
 			for _, consumedPort := range h.consumedResource["PORTS_UDP"].StringSetValue {
 				if *port == *consumedPort {
-					logger.Info("Unable to consume PORTS_UDP")
 					return false, nil
 				}
 			}
@@ -166,19 +164,23 @@ func (h *HostResourceManager) consumable(resources map[string]*ecs.Resource) (bo
 	gpuResouce, ok := resources["GPU"]
 	if ok {
 		if *(h.hostResource["GPU"].IntegerValue) < *(h.consumedResource["GPU"].IntegerValue)+*(gpuResouce.IntegerValue) {
-			logger.Info("Unable to consume GPU")
 			return false, nil
 		}
 	}
-	logger.Info("Able to consume resources")
 	return true, nil
 }
 
 func (h *HostResourceManager) release(taskArn string, resources map[string]*ecs.Resource) {
 	h.hostResourceManagerRWLock.Lock()
 	defer h.hostResourceManagerRWLock.Unlock()
-	logger.Info("Release called with resources", logger.Fields{"resources": resources})
-	logger.Info("Release called", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource})
+	defer logger.Debug("Consumed resources after task consume call", logger.Fields{
+		"taskArn":   taskArn,
+		"CPU":       *h.consumedResource["CPU"].IntegerValue,
+		"MEMORY":    *h.consumedResource["MEMORY"].IntegerValue,
+		"PORTS":     h.consumedResource["PORTS"].StringSetValue,
+		"PORTS_UDP": h.consumedResource["PORTS_UDP"].StringSetValue,
+		"GPU":       *h.consumedResource["GPU"].IntegerValue,
+	})
 	if h.taskConsumed[taskArn] {
 		// CPU
 		*h.consumedResource["CPU"].IntegerValue -= *resources["CPU"].IntegerValue
@@ -229,7 +231,6 @@ func (h *HostResourceManager) release(taskArn string, resources map[string]*ecs.
 		// Set consumed status
 		delete(h.taskConsumed, taskArn)
 	}
-	logger.Info("Release done", logger.Fields{"h.consumedResource": h.consumedResource, "h.hostResource": h.hostResource, "h.taskConsumed": h.taskConsumed})
 }
 
 func NewHostResourceManager(resourceMap map[string]*ecs.Resource) HostResourceManager {
