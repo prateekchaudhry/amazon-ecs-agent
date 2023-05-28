@@ -206,9 +206,11 @@ func (mtask *managedTask) overseeTask() {
 	// Goroutine monitorQueuedTasks dequeues in FIFO order as resources become available
 	// Internal tasks are started right away as their resources are not accounted for
 	if !mtask.IsInternal {
+		logger.Info(fmt.Sprintf("Queuing %s", mtask.Arn))
 		mtask.engine.enqueueTask(mtask)
 		// Wait for host resources required by this task to become available
 		mtask.waitForHostResources()
+		logger.Info(fmt.Sprintf("Progressing %s", mtask.Arn))
 	}
 
 	// Main infinite loop. This is where we receive messages and dispatch work.

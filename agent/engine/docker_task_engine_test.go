@@ -1636,11 +1636,11 @@ func TestPullAndUpdateContainerReference(t *testing.T) {
 // agent starts, container created, metadata file created, agent restarted, container recovered
 // during task engine init, metadata file updated
 func TestMetadataFileUpdatedAgentRestart(t *testing.T) {
-	conf := &defaultConfig
+	conf := defaultConfig
 	conf.ContainerMetadataEnabled = config.BooleanDefaultFalse{Value: config.ExplicitlyEnabled}
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
-	ctrl, client, _, privateTaskEngine, _, imageManager, metadataManager, serviceConnectManager := mocks(t, ctx, conf)
+	ctrl, client, _, privateTaskEngine, _, imageManager, metadataManager, serviceConnectManager := mocks(t, ctx, &conf)
 	defer ctrl.Finish()
 
 	var metadataUpdateWG sync.WaitGroup
@@ -2220,11 +2220,12 @@ func TestContainerMetadataUpdatedOnRestart(t *testing.T) {
 
 // TestContainerProgressParallize tests the container can be processed parallelly
 func TestContainerProgressParallize(t *testing.T) {
+	fmt.Printf("DOING TestContainerProgressParallize\n")
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 	ctrl, client, testTime, taskEngine, _, imageManager, _, serviceConnectManager := mocks(t, ctx, &defaultConfig)
 	defer ctrl.Finish()
-
+	t.Log("VALUE OF CFG THING",taskEngine.(*DockerTaskEngine).cfg.ContainerMetadataEnabled.Enabled())
 	stateChangeEvents := taskEngine.StateChangeEvents()
 	eventStream := make(chan dockerapi.DockerContainerChangeEvent)
 	state := taskEngine.(*DockerTaskEngine).State()
@@ -2258,14 +2259,20 @@ func TestContainerProgressParallize(t *testing.T) {
 	imageManager.EXPECT().RecordContainerReference(gomock.Any()).Return(nil).AnyTimes()
 	imageManager.EXPECT().GetImageStateFromImageName(gomock.Any()).Return(nil, false).AnyTimes()
 	client.EXPECT().ContainerEvents(gomock.Any()).Return(eventStream, nil)
-	client.EXPECT().PullImage(gomock.Any(), fastPullImage, gomock.Any(), gomock.Any())
+	client.EXPECT().PullImage(gomock.Any(), fastPullImage, gomock.Any(), gomock.Any()).Do(
+                func(ctx interface{}, image interface{}, auth interface{}, timeout interface{}) {
+                        fmt.Printf("FAST CONTAINER PULLED\n")
+                })
 	client.EXPECT().PullImage(gomock.Any(), slowPullImage, gomock.Any(), gomock.Any()).Do(
 		func(ctx interface{}, image interface{}, auth interface{}, timeout interface{}) {
+			fmt.Printf("SLOW CONTAINER PULL WAITING\n")
 			waitForFastPullContainer.Wait()
+			fmt.Printf("SLOW CONTAINER PULL DONE\n")
 		})
 	client.EXPECT().CreateContainer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Do(
 		func(ctx interface{}, cfg interface{}, hostconfig interface{}, name string, duration interface{}) {
 			if strings.Contains(name, slowPullImage) {
+				fmt.Printf("CREATE CONTAINER FOR SLOW CONTAINER\n")
 				slowContainerDockerName = name
 				state.AddContainer(&apicontainer.DockerContainer{
 					DockerID:   slowContainerDockerID,
@@ -2278,6 +2285,7 @@ func TestContainerProgressParallize(t *testing.T) {
 					eventStream <- event
 				}()
 			} else if strings.Contains(name, fastPullImage) {
+				fmt.Printf("CREATE CONTAINER FOR FAST CONTAINER\n")
 				fastContainerDockerName = name
 				state.AddTask(testTask)
 				state.AddContainer(&apicontainer.DockerContainer{
@@ -2297,6 +2305,7 @@ func TestContainerProgressParallize(t *testing.T) {
 	client.EXPECT().StartContainer(gomock.Any(), fastContainerDockerID, gomock.Any()).Do(
 		func(ctx interface{}, id string, duration interface{}) {
 			go func() {
+				fmt.Printf("START CONTAINER GOROUTINE FOR FAST CONTAINER\n")
 				event := createDockerEvent(apicontainerstatus.ContainerRunning)
 				event.DockerID = fastContainerDockerID
 				eventStream <- event
@@ -2305,6 +2314,7 @@ func TestContainerProgressParallize(t *testing.T) {
 	client.EXPECT().StartContainer(gomock.Any(), slowContainerDockerID, gomock.Any()).Do(
 		func(ctx interface{}, id string, duration interface{}) {
 			go func() {
+				fmt.Printf("START CONTAINER GOROUTINE FOR SLOW CONTAINER\n")
 				event := createDockerEvent(apicontainerstatus.ContainerRunning)
 				event.DockerID = slowContainerDockerID
 				eventStream <- event
