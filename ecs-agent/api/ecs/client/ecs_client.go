@@ -228,6 +228,9 @@ func (client *ecsClient) registerContainerInstance(clusterRef string, containerI
 	registerRequest.TotalResources = resources
 
 	registerRequest.ClientToken = &registrationToken
+	logger.Info("**** LOGGING RCI REQUEST ****", logger.Fields{
+		"registerRequest": registerRequest,
+	})
 	resp, err := client.standardClient.RegisterContainerInstance(&registerRequest)
 	if err != nil {
 		logger.Error("Unable to register as a container instance with ECS", logger.Fields{
@@ -236,6 +239,9 @@ func (client *ecsClient) registerContainerInstance(clusterRef string, containerI
 		return "", "", err
 	}
 
+	logger.Info("**** LOGGING RCI RESPONSE ****", logger.Fields{
+		"resp": resp,
+	})
 	var availabilityzone = ""
 	if resp != nil {
 		for _, attr := range resp.ContainerInstance.Attributes {
