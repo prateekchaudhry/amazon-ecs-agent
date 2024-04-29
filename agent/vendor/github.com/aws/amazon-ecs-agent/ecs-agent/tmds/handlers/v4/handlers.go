@@ -131,6 +131,47 @@ func TaskMetadataWithTagsHandler(
 	return taskMetadataHandler(agentState, metricsFactory, true)
 }
 
+// TasksMetadataHandler returns the HTTP handler function for handling task metadata requests.
+func TasksMetadataHandler(
+	agentState state.AgentState,
+	metricsFactory metrics.EntryFactory,
+) func(http.ResponseWriter, *http.Request) {
+	return tasksMetadataHandler(agentState, metricsFactory)
+}
+
+func tasksMetadataHandler(
+	agentState state.AgentState,
+	metricsFactory metrics.EntryFactory,
+) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		endpointContainerID := mux.Vars(r)[EndpointContainerIDMuxName]
+		var tasksMetadata state.TaskResponse
+		var err error
+		tasksMetadata, err = agentState.GetTasksMetadata(endpointContainerID)
+		if err != nil {
+			logger.Error("Failed to get v4 task metadata", logger.Fields{
+				field.TMDSEndpointContainerID: endpointContainerID,
+				field.Error:                   err,
+			})
+
+			responseCode, responseBody := getTaskErrorResponse(endpointContainerID, err)
+			utils.WriteJSONResponse(w, responseCode, responseBody, utils.RequestTypeTaskMetadata)
+
+			if utils.Is5XXStatus(responseCode) {
+				metricsFactory.New(metrics.InternalServerErrorMetricName).Done(err)
+			}
+
+			return
+		}
+
+		logger.Info("Writing response for v4 task metadata", logger.Fields{
+			field.TMDSEndpointContainerID: endpointContainerID,
+			field.TaskARN:                 tasksMetadata.TaskARN,
+		})
+		utils.WriteJSONResponse(w, http.StatusOK, tasksMetadata, utils.RequestTypeTaskMetadata)
+	}
+}
+
 func taskMetadataHandler(
 	agentState state.AgentState,
 	metricsFactory metrics.EntryFactory,

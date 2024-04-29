@@ -90,10 +90,18 @@ func (s *TMDSAgentState) GetTaskMetadata(v3EndpointID string) (tmdsv4.TaskRespon
 	return s.getTaskMetadata(v3EndpointID, false)
 }
 
+func (s *TMDSAgentState) GetTasksMetadata(v3EndpointID string) (tmdsv4.TasksResponse, error) {
+	return s.getTasksMetadata(v3EndpointID)
+}
+
 // Returns task metadata including task and container instance tags in v4 format for the
 // task identified by the provided endpointContainerID.
 func (s *TMDSAgentState) GetTaskMetadataWithTags(v3EndpointID string) (tmdsv4.TaskResponse, error) {
 	return s.getTaskMetadata(v3EndpointID, true)
+}
+
+func (s *TMDSAgentState) getTasksMetadata(v3EndpointID string) (tmdsv4.TasksResponse, error) {
+	return tmdsv4.TasksResponse{}, tmdsv4.NewErrorMetadataFetchFailure("Unable to find task")
 }
 
 // Returns task metadata in v4 format for the task identified by the provided endpointContainerID.

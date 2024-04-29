@@ -120,4 +120,6 @@ type AgentState interface {
 	// Returns ErrorStatsLookupFailure if container lookup fails.
 	// Returns ErrorStatsFetchFailure if something else goes wrong.
 	GetTaskStats(endpointContainerID string) (map[string]*StatsResponse, error)
+
+	GetTasksMetadata(endpointContainerID string) (TasksResponse, error)
 }

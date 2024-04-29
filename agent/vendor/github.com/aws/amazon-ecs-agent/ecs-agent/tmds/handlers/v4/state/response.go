@@ -27,6 +27,10 @@ const (
 	ClockStatusNotSynchronized = "NOT_SYNCHRONIZED"
 )
 
+type TasksResponse struct {
+	Tasks []TaskResponse
+}
+
 // TaskResponse is the v4 Task response. It augments the v4 Container response
 // with the v2 task response object.
 type TaskResponse struct {
