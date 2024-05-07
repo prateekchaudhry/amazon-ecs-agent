@@ -371,7 +371,6 @@ func (task *Task) initializeVolumes(cfg *config.Config, dockerClient dockerapi.D
 func (task *Task) PostUnmarshalTask(cfg *config.Config,
 	credentialsManager credentials.Manager, resourceFields *taskresource.ResourceFields,
 	dockerClient dockerapi.DockerClient, ctx context.Context, options ...Option) error {
-
 	task.adjustForPlatform(cfg)
 
 	// Initialize cgroup resource spec definition for later cgroup resource creation.

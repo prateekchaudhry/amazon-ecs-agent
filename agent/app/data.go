@@ -76,7 +76,7 @@ func (agent *ecsAgent) loadData(containerChangeEventStream *eventstream.EventStr
 		taskEngine: engine.NewTaskEngine(agent.cfg, agent.dockerClient, credentialsManager,
 			containerChangeEventStream, imageManager, hostResources, state,
 			agent.metadataManager, agent.resourceFields, execCmdMgr,
-			serviceConnectManager, daemonManagers),
+			serviceConnectManager, daemonManagers, agent.ecsDaemonManager),
 	}
 	s.taskEngine.SetDataClient(agent.dataClient)
 

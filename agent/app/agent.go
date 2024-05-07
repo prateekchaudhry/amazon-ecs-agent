@@ -35,6 +35,7 @@ import (
 	"github.com/aws/amazon-ecs-agent/agent/engine"
 	dm "github.com/aws/amazon-ecs-agent/agent/engine/daemonmanager"
 	"github.com/aws/amazon-ecs-agent/agent/engine/dockerstate"
+	ecsdaemonmanager "github.com/aws/amazon-ecs-agent/agent/engine/ecsdaemonmanager"
 	"github.com/aws/amazon-ecs-agent/agent/engine/execcmd"
 	engineserviceconnect "github.com/aws/amazon-ecs-agent/agent/engine/serviceconnect"
 	"github.com/aws/amazon-ecs-agent/agent/eni/pause"
@@ -151,6 +152,7 @@ type ecsAgent struct {
 	saveableOptionFactory       factory.SaveableOption
 	pauseLoader                 loader.Loader
 	serviceconnectManager       engineserviceconnect.Manager
+	ecsDaemonManager            ecsdaemonmanager.Manager
 	daemonManagers              map[string]dm.DaemonManager
 	eniWatcher                  *watcher.ENIWatcher
 	ebsWatcher                  *ebs.EBSWatcher
@@ -249,6 +251,7 @@ func newAgent(blackholeEC2Metadata bool, acceptInsecureCert *bool) (agent, error
 		saveableOptionFactory:       factory.NewSaveableOption(),
 		pauseLoader:                 pause.New(),
 		serviceconnectManager:       engineserviceconnect.NewManager(),
+		ecsDaemonManager:            ecsdaemonmanager.NewEcsDaemonManager(),
 		daemonManagers:              make(map[string]dm.DaemonManager),
 		cniClient:                   ecscni.NewClient(cfg.CNIPluginsPath),
 		metadataManager:             metadataManager,
@@ -359,7 +362,7 @@ func (agent *ecsAgent) doStart(containerChangeEventStream *eventstream.EventStre
 	// Create the task engine
 	taskEngine, currentEC2InstanceID, err := agent.newTaskEngine(
 		containerChangeEventStream, credentialsManager, state, imageManager, hostResources, execCmdMgr,
-		agent.serviceconnectManager, agent.daemonManagers)
+		agent.serviceconnectManager, agent.daemonManagers, agent.ecsDaemonManager)
 	if err != nil {
 		seelog.Criticalf("Unable to initialize new task engine: %v", err)
 		return exitcodes.ExitTerminal
@@ -450,6 +453,7 @@ func (agent *ecsAgent) doStart(containerChangeEventStream *eventstream.EventStre
 	// Load Managed Daemon images asynchronously
 	agent.loadManagedDaemonImagesAsync(imageManager)
 
+	agent.ecsDaemonManager.CreatePauseContainer(agent.cfg)
 	scManager := agent.serviceconnectManager
 	scManager.SetECSClient(client, agent.containerInstanceARN)
 	if loaded, _ := scManager.IsLoaded(agent.dockerClient); loaded {
@@ -485,6 +489,8 @@ func (agent *ecsAgent) doStart(containerChangeEventStream *eventstream.EventStre
 	taskEngine.SetDataClient(agent.dataClient)
 	imageManager.SetDataClient(agent.dataClient)
 	taskEngine.MustInit(agent.ctx)
+
+	taskEngine.AddTask(agent.ecsDaemonManager.GetPauseTask())
 
 	// Start back ground routines, including the telemetry session
 	deregisterInstanceEventStream := eventstream.NewEventStream(
@@ -574,7 +580,8 @@ func (agent *ecsAgent) newTaskEngine(containerChangeEventStream *eventstream.Eve
 	hostResources map[string]*ecsmodel.Resource,
 	execCmdMgr execcmd.Manager,
 	serviceConnectManager engineserviceconnect.Manager,
-	daemonManagers map[string]dm.DaemonManager) (engine.TaskEngine, string, error) {
+	daemonManagers map[string]dm.DaemonManager,
+	ecsdaemonmanager ecsdaemonmanager.Manager) (engine.TaskEngine, string, error) {
 
 	containerChangeEventStream.StartListening()
 
@@ -583,7 +590,7 @@ func (agent *ecsAgent) newTaskEngine(containerChangeEventStream *eventstream.Eve
 		return engine.NewTaskEngine(agent.cfg, agent.dockerClient, credentialsManager,
 			containerChangeEventStream, imageManager, hostResources, state,
 			agent.metadataManager, agent.resourceFields, execCmdMgr,
-			serviceConnectManager, daemonManagers), "", nil
+			serviceConnectManager, daemonManagers, ecsdaemonmanager), "", nil
 	}
 
 	savedData, err := agent.loadData(containerChangeEventStream, credentialsManager, state, imageManager, hostResources, execCmdMgr, serviceConnectManager, daemonManagers)
@@ -613,7 +620,7 @@ func (agent *ecsAgent) newTaskEngine(containerChangeEventStream *eventstream.Eve
 		return engine.NewTaskEngine(agent.cfg, agent.dockerClient, credentialsManager,
 			containerChangeEventStream, imageManager, hostResources, state, agent.metadataManager,
 			agent.resourceFields, execCmdMgr, serviceConnectManager,
-			daemonManagers), currentEC2InstanceID, nil
+			daemonManagers, ecsdaemonmanager), currentEC2InstanceID, nil
 	}
 
 	if savedData.cluster != "" {

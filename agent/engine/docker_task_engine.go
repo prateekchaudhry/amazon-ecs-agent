@@ -37,6 +37,7 @@ import (
 	dm "github.com/aws/amazon-ecs-agent/agent/engine/daemonmanager"
 	"github.com/aws/amazon-ecs-agent/agent/engine/dependencygraph"
 	"github.com/aws/amazon-ecs-agent/agent/engine/dockerstate"
+	"github.com/aws/amazon-ecs-agent/agent/engine/ecsdaemonmanager"
 	"github.com/aws/amazon-ecs-agent/agent/engine/execcmd"
 	"github.com/aws/amazon-ecs-agent/agent/engine/serviceconnect"
 	"github.com/aws/amazon-ecs-agent/agent/metrics"
@@ -173,6 +174,7 @@ type DockerTaskEngine struct {
 	containerStatusToTransitionFunction map[apicontainerstatus.ContainerStatus]transitionApplyFunc
 	metadataManager                     containermetadata.Manager
 	serviceconnectManager               serviceconnect.Manager
+	ecsdaemonmanager                    ecsdaemonmanager.Manager
 
 	// daemonManagers map is threadsafe for reads as it's written only once at startup
 	daemonManagers      map[string]dm.DaemonManager
@@ -219,7 +221,8 @@ func NewDockerTaskEngine(cfg *config.Config,
 	resourceFields *taskresource.ResourceFields,
 	execCmdMgr execcmd.Manager,
 	serviceConnectManager serviceconnect.Manager,
-	daemonManagers map[string]dm.DaemonManager) *DockerTaskEngine {
+	daemonManagers map[string]dm.DaemonManager,
+	ecsdaemonmanager ecsdaemonmanager.Manager) *DockerTaskEngine {
 	dockerTaskEngine := &DockerTaskEngine{
 		cfg:        cfg,
 		client:     client,
@@ -235,6 +238,7 @@ func NewDockerTaskEngine(cfg *config.Config,
 		containerChangeEventStream: containerChangeEventStream,
 		imageManager:               imageManager,
 		hostResourceManager:        hostResourceManager,
+		ecsdaemonmanager:           ecsdaemonmanager,
 		cniClient:                  ecscni.NewClient(cfg.CNIPluginsPath),
 		appnetClient:               appnet.CreateClient(),
 
@@ -1175,7 +1179,6 @@ func (engine *DockerTaskEngine) AddTask(task *apitask.Task) {
 			logger.Info("docker_task_engine: Added AppNet Relay task to engine")
 		}
 	}
-
 	engine.tasksLock.Lock()
 	defer engine.tasksLock.Unlock()
 
