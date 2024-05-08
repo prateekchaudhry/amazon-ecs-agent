@@ -58,6 +58,7 @@ import (
 	"github.com/aws/amazon-ecs-agent/ecs-agent/utils/ttime"
 	"github.com/aws/aws-sdk-go/aws"
 	ep "github.com/aws/aws-sdk-go/aws/endpoints"
+	cniTypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/pkg/errors"
@@ -2052,6 +2053,9 @@ func (engine *DockerTaskEngine) provisionContainerResources(task *apitask.Task, 
 		field.TaskID:    task.GetID(),
 		field.Container: container.Name,
 	})
+	if strings.Contains(task.Arn, "daemon") {
+		return engine.provisionContainerResourcesDaemon(task, container)
+	}
 	if task.IsNetworkModeAWSVPC() {
 		return engine.provisionContainerResourcesAwsvpc(task, container)
 	} else if task.IsNetworkModeBridge() {
@@ -2074,6 +2078,90 @@ func (engine *DockerTaskEngine) provisionContainerResourcesAwsvpc(task *apitask.
 	task.SetPausePIDInVolumeResources(strconv.Itoa(containerInspectOutput.State.Pid))
 
 	cniConfig, err := engine.buildCNIConfigFromTaskContainerAwsvpc(task, containerInspectOutput, true)
+	if err != nil {
+		return dockerapi.DockerContainerMetadata{
+			Error: ContainerNetworkingError{
+				fromError: fmt.Errorf(
+					"container resource provisioning: unable to build cni configuration, %+v", err),
+			},
+		}
+	}
+
+	logger.Info("Setting up CNI config for task", logger.Fields{
+		field.TaskID:        task.GetID(),
+		"cniContainerID":    cniConfig.ContainerID,
+		"cniPluginPath":     cniConfig.PluginsPath,
+		"cniID":             cniConfig.ID,
+		"cniBridgeName":     cniConfig.BridgeName,
+		"cniContainerNetNs": cniConfig.ContainerNetNS,
+	})
+
+	// Invoke the libcni to config the network namespace for the container
+	result, err := engine.cniClient.SetupNS(engine.ctx, cniConfig, cniSetupTimeout)
+	if err != nil {
+		logger.Error("Unable to configure pause container namespace", logger.Fields{
+			field.TaskID: task.GetID(),
+			field.Error:  err,
+		})
+		return dockerapi.DockerContainerMetadata{
+			DockerID: cniConfig.ContainerID,
+			Error: ContainerNetworkingError{fmt.Errorf(
+				"container resource provisioning: failed to setup network namespace: %+v", err)},
+		}
+	}
+
+	if result == nil {
+		logger.Error("Expect non-empty result from network namespace setup", logger.Fields{
+			field.TaskID: task.GetID(),
+		})
+		return dockerapi.DockerContainerMetadata{
+			DockerID: cniConfig.ContainerID,
+			Error: ContainerNetworkingError{fmt.Errorf(
+				"container resource provisioning: empty result from network namespace setup")},
+		}
+	}
+
+	// This is the IP of the task assigned on the bridge for IAM Task roles
+	taskIP := result.IPs[0].Address.IP.String()
+	logger.Info("Task associated with ip address", logger.Fields{
+		field.TaskID: task.GetID(),
+		"ip":         taskIP,
+	})
+	engine.state.AddTaskIPAddress(taskIP, task.Arn)
+	task.SetLocalIPAddress(taskIP)
+	engine.saveTaskData(task)
+
+	// Invoke additional commands required to configure the task namespace routing.
+	err = engine.namespaceHelper.ConfigureTaskNamespaceRouting(engine.ctx, task.GetPrimaryENI(), cniConfig, result)
+	if err != nil {
+		logger.Error("Unable to configure pause container namespace", logger.Fields{
+			field.TaskID: task.GetID(),
+			field.Error:  err,
+		})
+		return dockerapi.DockerContainerMetadata{
+			DockerID: cniConfig.ContainerID,
+			Error: ContainerNetworkingError{fmt.Errorf(
+				"container resource provisioning: failed to setup network namespace: %+v", err)},
+		}
+	}
+
+	return dockerapi.MetadataFromContainer(containerInspectOutput)
+}
+
+func (engine *DockerTaskEngine) provisionContainerResourcesDaemon(task *apitask.Task, container *apicontainer.Container) dockerapi.DockerContainerMetadata {
+	containerInspectOutput, err := engine.inspectContainer(task, container)
+	if err != nil {
+		return dockerapi.DockerContainerMetadata{
+			Error: ContainerNetworkingError{
+				fromError: fmt.Errorf(
+					"container resource provisioning: cannot setup task network namespace due to error inspecting pause container: %+v", err),
+			},
+		}
+	}
+
+	task.SetPausePIDInVolumeResources(strconv.Itoa(containerInspectOutput.State.Pid))
+
+	cniConfig, err := engine.buildCNIConfigFromTaskContainerDaemon(task, containerInspectOutput, true)
 	if err != nil {
 		return dockerapi.DockerContainerMetadata{
 			Error: ContainerNetworkingError{
@@ -2307,6 +2395,43 @@ func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainerAwsvpc(
 		return nil, errors.Wrapf(err, "engine: failed to build cni configuration from task")
 	}
 
+	return cniConfig, nil
+}
+
+func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainerDaemon(
+	task *apitask.Task,
+	containerInspectOutput *types.ContainerJSON,
+	includeIPAMConfig bool) (*ecscni.Config, error) {
+	cniConfig := &ecscni.Config{
+		BlockInstanceMetadata:    false,
+		MinSupportedCNIVersion:   config.DefaultMinSupportedCNIVersion,
+		InstanceENIDNSServerList: []string{},
+	}
+
+	ipnet, _ := cniTypes.ParseCIDR("169.254.172.1/22")
+	cniIpNet := cniTypes.IPNet(*ipnet)
+	cniConfig.AdditionalLocalRoutes = []cniTypes.IPNet{cniIpNet}
+	cniConfig.IPAMV4Address = &cniIpNet
+
+	cniConfig.ContainerPID = strconv.Itoa(containerInspectOutput.State.Pid)
+	cniConfig.ContainerID = containerInspectOutput.ID
+	cniConfig.ContainerNetNS = ""
+
+	// For pause containers, NetNS would be none
+	// For other containers, NetNS would be of format container:<pause_container_ID>
+	if containerInspectOutput.HostConfig.NetworkMode.IsNone() {
+		cniConfig.ContainerNetNS = containerInspectOutput.HostConfig.NetworkMode.NetworkName()
+	} else if containerInspectOutput.HostConfig.NetworkMode.IsContainer() {
+		cniConfig.ContainerNetNS = fmt.Sprintf("container:%s", containerInspectOutput.HostConfig.NetworkMode.ConnectedContainer())
+	} else {
+		return nil, errors.New("engine: failed to build cni configuration from the daemon due to invalid container network namespace")
+	}
+
+	cniConfig, err := task.BuildCNIConfigDaemon(includeIPAMConfig, cniConfig)
+	if err != nil {
+		return nil, errors.Wrapf(err, "engine: failed to build cni configuration from daemon")
+	}
+	logger.Info("CNICONFIG", logger.Fields{"CNICONFIG": cniConfig})
 	return cniConfig, nil
 }
 

@@ -116,3 +116,7 @@ func (task *Task) BuildCNIConfigAwsvpc(includeIPAMConfig bool, cniConfig *ecscni
 func (task *Task) BuildCNIConfigBridgeMode(cniConfig *ecscni.Config, containerName string) (*ecscni.Config, error) {
 	return nil, errors.New("unsupported platform")
 }
+
+func (task *Task) BuildCNIConfigDaemon(includeIPAMConfig bool, cniConfig *ecscni.Config) (*ecscni.Config, error) {
+	return nil, errors.New("unsupported platform")
+}

@@ -349,6 +349,27 @@ func (task *Task) BuildCNIConfigAwsvpc(includeIPAMConfig bool, cniConfig *ecscni
 	return cniConfig, nil
 }
 
+func (task *Task) BuildCNIConfigDaemon(includeIPAMConfig bool, cniConfig *ecscni.Config) (*ecscni.Config, error) {
+	var netconf *libcni.NetworkConfig
+	var ifName string
+	var err error
+
+	// Build the bridge CNI network configuration.
+	// All AWSVPC tasks have a bridge network.
+	ifName, netconf, err = ecscni.NewBridgeNetworkConfig(cniConfig, includeIPAMConfig)
+	if err != nil {
+		return nil, err
+	}
+	cniConfig.NetworkConfigs = append(cniConfig.NetworkConfigs, &ecscni.NetworkConfig{
+		IfName:           ifName,
+		CNINetworkConfig: netconf,
+	})
+
+	cniConfig.ContainerNetNS = fmt.Sprintf(ecscni.NetnsFormat, cniConfig.ContainerPID)
+
+	return cniConfig, nil
+}
+
 // BuildCNIConfigBridgeMode builds a list of CNI network configurations for a task in docker bridge mode.
 // Currently the only plugin in available is for Service Connect
 func (task *Task) BuildCNIConfigBridgeMode(cniConfig *ecscni.Config, containerName string) (*ecscni.Config, error) {

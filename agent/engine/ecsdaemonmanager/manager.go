@@ -43,6 +43,7 @@ func NewEcsDaemonManager() *ecsDaemonManager {
 }
 
 func (edm *ecsDaemonManager) GetPauseContainerName() string {
+	edm.pauseContainerName = "~daemon~ecs~pause"
 	return edm.pauseContainerName
 }
 
@@ -56,7 +57,7 @@ func (edm *ecsDaemonManager) CreatePauseContainer(cfg *config.Config) *apicontai
 func (edm *ecsDaemonManager) initializePauseContainer(cfg *config.Config) {
 	edm.pauseContainer = apicontainer.NewContainerWithSteadyState(apicontainerstatus.ContainerResourcesProvisioned)
 	edm.pauseContainer.TransitionDependenciesMap = make(map[apicontainerstatus.ContainerStatus]apicontainer.TransitionDependencySet)
-	edm.pauseContainer.Name = edm.pauseContainerName
+	edm.pauseContainer.Name = edm.GetPauseContainerName()
 	edm.pauseContainer.Image = fmt.Sprintf("%s:%s", cfg.PauseContainerImageName, cfg.PauseContainerTag)
 	edm.pauseContainer.Essential = true
 	edm.pauseContainer.Type = apicontainer.ContainerCNIPause
