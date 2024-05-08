@@ -2408,9 +2408,8 @@ func (engine *DockerTaskEngine) buildCNIConfigFromTaskContainerDaemon(
 		InstanceENIDNSServerList: []string{},
 	}
 
-	ipnet, _ := cniTypes.ParseCIDR("169.254.172.1/22")
+	ipnet, _ := cniTypes.ParseCIDR("169.254.172.50/22")
 	cniIpNet := cniTypes.IPNet(*ipnet)
-	cniConfig.AdditionalLocalRoutes = []cniTypes.IPNet{cniIpNet}
 	cniConfig.IPAMV4Address = &cniIpNet
 
 	cniConfig.ContainerPID = strconv.Itoa(containerInspectOutput.State.Pid)
