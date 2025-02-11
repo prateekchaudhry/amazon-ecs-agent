@@ -38,6 +38,7 @@ Source2:        ecs.service
 Source3:        amazon-ecs-volume-plugin.service
 Source4:        amazon-ecs-volume-plugin.socket
 Source5:        amazon-ecs-volume-plugin.conf
+Source6:        ebs-csi-driver.tar
 
 BuildRequires:  golang >= 1.22.0
 %if %{with systemd}
@@ -161,6 +162,8 @@ required routes among its preparation steps.
 # each of these should build for arm and amd arch
 make release-agent-internal
 ./scripts/gobuild.sh %{gobuild_tag}
+make -C ./ecs-agent/daemonimages/csidriver
+cp ecs-agent/daemonimages/csidriver/tarfiles/ebs-csi-driver.tar .
 
 %install
 install -D amazon-ecs-init %{buildroot}%{_libexecdir}/amazon-ecs-init
@@ -175,6 +178,7 @@ touch %{buildroot}%{_sysconfdir}/ecs/ecs.config.json
 mkdir -p %{buildroot}%{_cachedir}/ecs
 echo 2 > %{buildroot}%{_cachedir}/ecs/state
 install -m %{no_exec_perm} %{agent_image} %{buildroot}%{_cachedir}/ecs/
+install -m %{no_exec_perm} %{SOURCE6} %{buildroot}%{_cachedir}/ecs/
 
 mkdir -p %{buildroot}%{_sharedstatedir}/ecs/data
 
@@ -196,6 +200,7 @@ install -m %{no_exec_perm} -D %{SOURCE5} %{buildroot}%{_sysconfdir}/init/amazon-
 %config(noreplace) %ghost %{_sysconfdir}/ecs/ecs.config.json
 %ghost %{_cachedir}/ecs/ecs-agent.tar
 %{_cachedir}/ecs/%{basename:%{agent_image}}
+%{_cachedir}/ecs/ebs-csi-driver.tar
 %{_cachedir}/ecs/state
 %dir %{_sharedstatedir}/ecs/data
 
@@ -211,6 +216,7 @@ install -m %{no_exec_perm} -D %{SOURCE5} %{buildroot}%{_sysconfdir}/init/amazon-
 %post
 # symlink the built ecs-agent image at a loadable path
 ln -sf %{basename:%{agent_image}} %{_cachedir}/ecs/ecs-agent.tar
+docker load -i %{_cachedir}/ecs/ebs-csi-driver.tar || true
 %if %{with systemd}
 %systemd_post ecs
 %systemd_post amazon-ecs-volume-plugin.service
