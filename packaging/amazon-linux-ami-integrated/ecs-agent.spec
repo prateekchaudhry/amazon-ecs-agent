@@ -163,7 +163,6 @@ required routes among its preparation steps.
 make release-agent-internal
 ./scripts/gobuild.sh %{gobuild_tag}
 make -C ./ecs-agent/daemonimages/csidriver
-cp ecs-agent/daemonimages/csidriver/tarfiles/ebs-csi-driver.tar .
 
 %install
 install -D amazon-ecs-init %{buildroot}%{_libexecdir}/amazon-ecs-init
@@ -227,6 +226,12 @@ docker load -i %{_cachedir}/ecs/ebs-csi-driver.tar || true
 
 %else
 %triggerun -- docker
+
+# Reload image if docker is upgraded
+if [ -f %{_cachedir}/ecs/ebs-csi-driver.tar  ]; then
+    docker load -i %{_cachedir}/ecs/ebs-csi-driver.tar || :
+fi
+
 # record whether or not our service was running when docker is upgraded
 ecs_status=$(/sbin/status ecs 2>/dev/null || :)
 if grep -qF "start/" <<< "${ecs_status}"; then
