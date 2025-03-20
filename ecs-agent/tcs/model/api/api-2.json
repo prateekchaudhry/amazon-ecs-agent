@@ -5,13 +5,10 @@
     "endpointPrefix":"ecstcs",
     "jsonVersion":"1.1",
     "protocol":"json",
-    "protocols":["json"],
     "serviceAbbreviation":"Amazon ECS TCS",
     "serviceFullName":"Amazon EC2 Container Service Telemetry Communication Service",
     "signatureVersion":"v4",
-    "targetPrefix":"AmazonEC2ContainerServiceTelemetryV20150310",
-    "uid":"ecstcs-2015-03-10",
-    "auth":["aws.auth#sigv4"]
+    "targetPrefix":"AmazonEC2ContainerServiceTelemetryV20150310"
   },
   "operations":{
     "Heartbeat":{
@@ -247,8 +244,8 @@
     "InstanceStorageMetrics":{
       "type":"structure",
       "members":{
-        "oSFilesystem":{"shape":"Percentage"},
-        "dataFilesystem":{"shape":"Percentage"}
+        "OSFilesystem":{"shape":"Percentage"},
+        "DataFilesystem":{"shape":"Percentage"}
       }
     },
     "InvalidParameterException":{
