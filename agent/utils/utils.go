@@ -33,8 +33,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/smithy-go"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	"github.com/pkg/errors"
 )
@@ -145,18 +143,12 @@ func IsAWSErrorCodeEqual(err error, code string) bool {
 	return ok && awsErr.Code() == code
 }
 
-// GetResponseErrorStatusCode returns the status code from a
-// ResponseError error of a server client error from AWS SDK Go V2,
-// or 0 if the error is not of that type
-// https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/handle-errors.html
-func GetResponseErrorStatusCode(err error) int {
+// GetRequestFailureStatusCode returns the status code from a
+// RequestFailure error, or 0 if the error is not of that type
+func GetRequestFailureStatusCode(err error) int {
 	var statusCode int
-	var oe *smithy.OperationError
-	if errors.As(err, &oe) {
-		var responseErr *smithyhttp.ResponseError
-		if errors.As(oe.Err, &responseErr) {
-			statusCode = responseErr.HTTPStatusCode()
-		}
+	if reqErr, ok := err.(awserr.RequestFailure); ok {
+		statusCode = reqErr.StatusCode()
 	}
 	return statusCode
 }
