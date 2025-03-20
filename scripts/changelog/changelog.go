@@ -148,11 +148,10 @@ func getRPMChangeString(allChange []Change) string {
 //
 // amazon-ecs-init (1.36.0-1) stable; urgency=medium
 //
-//   - Cache Agent version 1.36.0
+//  * Cache Agent version 1.36.0
+//  * capture a fixed tail of container logs when removing a container
 //
-//   - capture a fixed tail of container logs when removing a container
-//
-//     -- Cameron Sparr <cssparr@amazon.com> Wed, 08 Jan 2020 11:00:00 -0800
+//  -- Cameron Sparr <cssparr@amazon.com> Wed, 08 Jan 2020 11:00:00 -0800
 func getUbuntuChangeString(allChange []Change) string {
 	result := ""
 	for _, change := range allChange {
@@ -172,9 +171,9 @@ func getUbuntuChangeString(allChange []Change) string {
 // -------------------------------------------------------------------
 // Tue Apr 22 20:54:26 UTC 2013 - your@email.com
 //
-//   - level 1 bullet point; long descriptions
-//     should wrap
-//   - another l1 bullet point
+// - level 1 bullet point; long descriptions
+//   should wrap
+// - another l1 bullet point
 func getSuseChangeString(allChange []Change) string {
 	result := ""
 	for _, change := range allChange {
@@ -191,9 +190,9 @@ func getSuseChangeString(allChange []Change) string {
 
 // format as follows
 //
-//	## 1.35.0
-//	* Cache Agent version 1.36.0
-//	* capture a fixed tail of container logs when removing a container
+//  ## 1.35.0
+//  * Cache Agent version 1.36.0
+//  * capture a fixed tail of container logs when removing a container
 func getTopLevelChangeString(allChange []Change) string {
 	result := "# Changelog\n\n"
 	for _, change := range allChange {
