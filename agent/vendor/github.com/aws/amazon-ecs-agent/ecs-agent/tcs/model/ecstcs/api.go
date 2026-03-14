@@ -347,7 +347,13 @@ type GeneralMetric struct {
 
 	MetricName *string `json:"metricName,omitempty" type:"string"`
 
+	MetricValueDouble *float64 `json:"metricValueDouble,omitempty" type:"double"`
+
+	MetricValueInteger *int64 `json:"metricValueInteger,omitempty" type:"long"`
+
 	MetricValues []*float64 `json:"metricValues,omitempty" type:"list"`
+
+	Unit *string `json:"unit,omitempty" type:"string"`
 }
 
 // String returns the string representation.
@@ -498,6 +504,8 @@ func (s HeartbeatOutput) GoString() string {
 
 type InstanceMetrics struct {
 	_ struct{} `type:"structure"`
+
+	GeneralMetricsPayload []*GeneralMetricsWrapper `json:"generalMetricsPayload,omitempty" type:"list"`
 
 	Storage *InstanceStorageMetrics `json:"storage,omitempty" type:"structure"`
 }

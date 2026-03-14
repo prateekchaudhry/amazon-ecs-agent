@@ -297,3 +297,261 @@ func TestEphemeralStorageMetricsNilValues(t *testing.T) {
 		})
 	}
 }
+
+
+// Feature: tacs-payload-gpu-metrics, Property 1: GeneralMetric JSON round-trip preserves all fields.
+// Validates: Requirements 1.5, 1.6, 1.7, 1.8
+func TestGeneralMetricJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		Name   string
+		Metric GeneralMetric
+	}{
+		{
+			Name:   "all fields nil",
+			Metric: GeneralMetric{},
+		},
+		{
+			Name: "only old fields populated",
+			Metric: GeneralMetric{
+				MetricName:   aws.String("RequestCount"),
+				MetricValues: []*float64{aws.Float64(1.0), aws.Float64(2.0)},
+				MetricCounts: []*int64{aws.Int64(10), aws.Int64(20)},
+			},
+		},
+		{
+			Name: "only new fields populated",
+			Metric: GeneralMetric{
+				MetricName:         aws.String("GPUUtilization"),
+				MetricValueDouble:  aws.Float64(45.5),
+				MetricValueInteger: aws.Int64(100),
+				Unit:               aws.String("Percent"),
+			},
+		},
+		{
+			Name: "all fields populated",
+			Metric: GeneralMetric{
+				MetricName:         aws.String("GPUMemoryUsed"),
+				MetricValues:       []*float64{aws.Float64(3.14)},
+				MetricCounts:       []*int64{aws.Int64(1)},
+				MetricValueDouble:  aws.Float64(99.9),
+				MetricValueInteger: aws.Int64(8589934592),
+				Unit:               aws.String("Bytes"),
+			},
+		},
+		{
+			Name: "zero values for new fields",
+			Metric: GeneralMetric{
+				MetricName:         aws.String("GPUPower"),
+				MetricValueDouble:  aws.Float64(0.0),
+				MetricValueInteger: aws.Int64(0),
+				Unit:               aws.String(""),
+			},
+		},
+		{
+			Name: "large double value",
+			Metric: GeneralMetric{
+				MetricName:        aws.String("GPUTemp"),
+				MetricValueDouble: aws.Float64(1.7976931348623157e+308),
+				Unit:              aws.String("None"),
+			},
+		},
+		{
+			Name: "negative double value",
+			Metric: GeneralMetric{
+				MetricName:        aws.String("GPUThrottleOffset"),
+				MetricValueDouble: aws.Float64(-42.5),
+			},
+		},
+		{
+			Name: "only MetricValueInteger populated",
+			Metric: GeneralMetric{
+				MetricName:         aws.String("GPUCount"),
+				MetricValueInteger: aws.Int64(4),
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+			// Serialize to JSON.
+			data, err := json.Marshal(&tc.Metric)
+			require.NoError(t, err)
+
+			// Deserialize back.
+			var roundTripped GeneralMetric
+			err = json.Unmarshal(data, &roundTripped)
+			require.NoError(t, err)
+
+			// Compare all fields.
+			assert.Equal(t, tc.Metric.MetricName, roundTripped.MetricName)
+			assert.Equal(t, tc.Metric.MetricValues, roundTripped.MetricValues)
+			assert.Equal(t, tc.Metric.MetricCounts, roundTripped.MetricCounts)
+			assert.Equal(t, tc.Metric.MetricValueDouble, roundTripped.MetricValueDouble)
+			assert.Equal(t, tc.Metric.MetricValueInteger, roundTripped.MetricValueInteger)
+			assert.Equal(t, tc.Metric.Unit, roundTripped.Unit)
+		})
+	}
+}
+
+// Feature: tacs-payload-gpu-metrics, Property 2: Nil GeneralMetricsPayload is omitted from JSON.
+// Validates: Requirements 2.3, 3.3
+func TestNilGeneralMetricsPayloadOmittedFromJSON(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		Name       string
+		StructType string
+		Marshal    func() ([]byte, error)
+	}{
+		{
+			Name:       "TaskMetric with nil GeneralMetricsPayload",
+			StructType: "TaskMetric",
+			Marshal: func() ([]byte, error) {
+				tm := TaskMetric{
+					TaskArn:               aws.String("arn:aws:ecs:us-east-1:123456789012:task/test"),
+					GeneralMetricsPayload: nil,
+				}
+				return json.Marshal(&tm)
+			},
+		},
+		{
+			Name:       "TaskMetric with populated GeneralMetricsPayload",
+			StructType: "TaskMetric",
+			Marshal: func() ([]byte, error) {
+				tm := TaskMetric{
+					TaskArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task/test"),
+					GeneralMetricsPayload: []*GeneralMetricsWrapper{
+						{
+							MetricType: aws.String("GPU"),
+							GeneralMetrics: []*GeneralMetric{
+								{MetricName: aws.String("GPUUtilization"), MetricValueDouble: aws.Float64(50.0), Unit: aws.String("Percent")},
+							},
+						},
+					},
+				}
+				return json.Marshal(&tm)
+			},
+		},
+		{
+			Name:       "InstanceMetrics with nil GeneralMetricsPayload",
+			StructType: "InstanceMetrics",
+			Marshal: func() ([]byte, error) {
+				im := InstanceMetrics{
+					Storage:               &InstanceStorageMetrics{RootFilesystem: aws.Float64(80.0)},
+					GeneralMetricsPayload: nil,
+				}
+				return json.Marshal(&im)
+			},
+		},
+		{
+			Name:       "InstanceMetrics with populated GeneralMetricsPayload",
+			StructType: "InstanceMetrics",
+			Marshal: func() ([]byte, error) {
+				im := InstanceMetrics{
+					Storage: &InstanceStorageMetrics{RootFilesystem: aws.Float64(80.0)},
+					GeneralMetricsPayload: []*GeneralMetricsWrapper{
+						{
+							MetricType: aws.String("GPU"),
+							GeneralMetrics: []*GeneralMetric{
+								{MetricName: aws.String("GPULimit"), MetricValueInteger: aws.Int64(4), Unit: aws.String("Count")},
+							},
+						},
+					},
+				}
+				return json.Marshal(&im)
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+			data, err := tc.Marshal()
+			require.NoError(t, err)
+
+			jsonString := string(data)
+			var raw map[string]json.RawMessage
+			err = json.Unmarshal(data, &raw)
+			require.NoError(t, err)
+
+			_, hasKey := raw["generalMetricsPayload"]
+			if tc.Name == "TaskMetric with nil GeneralMetricsPayload" || tc.Name == "InstanceMetrics with nil GeneralMetricsPayload" {
+				assert.False(t, hasKey, "generalMetricsPayload should be omitted when nil, got: %s", jsonString)
+			} else {
+				assert.True(t, hasKey, "generalMetricsPayload should be present when populated, got: %s", jsonString)
+			}
+		})
+	}
+}
+
+// Feature: tacs-payload-gpu-metrics, Property 3: TaskMetric Validate passes with GeneralMetricsPayload.
+// Validates: Requirements 2.4
+func TestTaskMetricValidateWithGeneralMetricsPayload(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		Name                  string
+		GeneralMetricsPayload []*GeneralMetricsWrapper
+	}{
+		{
+			Name:                  "nil GeneralMetricsPayload",
+			GeneralMetricsPayload: nil,
+		},
+		{
+			Name:                  "empty GeneralMetricsPayload",
+			GeneralMetricsPayload: []*GeneralMetricsWrapper{},
+		},
+		{
+			Name: "single wrapper with single metric",
+			GeneralMetricsPayload: []*GeneralMetricsWrapper{
+				{
+					MetricType: aws.String("GPU"),
+					GeneralMetrics: []*GeneralMetric{
+						{MetricName: aws.String("GPUUtilization"), MetricValueDouble: aws.Float64(75.0), Unit: aws.String("Percent")},
+					},
+				},
+			},
+		},
+		{
+			Name: "multiple wrappers with dimensions",
+			GeneralMetricsPayload: []*GeneralMetricsWrapper{
+				{
+					MetricType: aws.String("GPU"),
+					Dimensions: []*Dimension{{Key: aws.String("GpuDevice"), Value: aws.String("0")}},
+					GeneralMetrics: []*GeneralMetric{
+						{MetricName: aws.String("GPUUtilization"), MetricValueDouble: aws.Float64(45.0), Unit: aws.String("Percent")},
+						{MetricName: aws.String("GPUMemoryUsed"), MetricValueInteger: aws.Int64(4096), Unit: aws.String("Megabytes")},
+					},
+				},
+				{
+					MetricType: aws.String("GPU"),
+					Dimensions: []*Dimension{{Key: aws.String("GpuDevice"), Value: aws.String("1")}},
+					GeneralMetrics: []*GeneralMetric{
+						{MetricName: aws.String("GPUUtilization"), MetricValueDouble: aws.Float64(90.0), Unit: aws.String("Percent")},
+					},
+				},
+			},
+		},
+		{
+			Name: "wrapper with nil GeneralMetrics inside",
+			GeneralMetricsPayload: []*GeneralMetricsWrapper{
+				{
+					MetricType:     aws.String("GPU"),
+					GeneralMetrics: nil,
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+			tm := TaskMetric{
+				TaskArn:               aws.String("arn:aws:ecs:us-east-1:123456789012:task/test"),
+				GeneralMetricsPayload: tc.GeneralMetricsPayload,
+			}
+			err := tm.Validate()
+			assert.NoError(t, err)
+		})
+	}
+}
