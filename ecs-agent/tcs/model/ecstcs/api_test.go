@@ -324,7 +324,7 @@ func TestGeneralMetricJSONRoundTrip(t *testing.T) {
 			Metric: GeneralMetric{
 				MetricName:         aws.String("GPUUtilization"),
 				MetricValueDouble:  aws.Float64(45.5),
-				MetricValueInteger: aws.Int64(100),
+				MetricValueLong: aws.Int64(100),
 				Unit:               aws.String("Percent"),
 			},
 		},
@@ -335,7 +335,7 @@ func TestGeneralMetricJSONRoundTrip(t *testing.T) {
 				MetricValues:       []*float64{aws.Float64(3.14)},
 				MetricCounts:       []*int64{aws.Int64(1)},
 				MetricValueDouble:  aws.Float64(99.9),
-				MetricValueInteger: aws.Int64(8589934592),
+				MetricValueLong: aws.Int64(8589934592),
 				Unit:               aws.String("Bytes"),
 			},
 		},
@@ -344,7 +344,7 @@ func TestGeneralMetricJSONRoundTrip(t *testing.T) {
 			Metric: GeneralMetric{
 				MetricName:         aws.String("GPUPower"),
 				MetricValueDouble:  aws.Float64(0.0),
-				MetricValueInteger: aws.Int64(0),
+				MetricValueLong: aws.Int64(0),
 				Unit:               aws.String(""),
 			},
 		},
@@ -364,10 +364,10 @@ func TestGeneralMetricJSONRoundTrip(t *testing.T) {
 			},
 		},
 		{
-			Name: "only MetricValueInteger populated",
+			Name: "only MetricValueLong populated",
 			Metric: GeneralMetric{
 				MetricName:         aws.String("GPUCount"),
-				MetricValueInteger: aws.Int64(4),
+				MetricValueLong: aws.Int64(4),
 			},
 		},
 	}
@@ -389,7 +389,7 @@ func TestGeneralMetricJSONRoundTrip(t *testing.T) {
 			assert.Equal(t, tc.Metric.MetricValues, roundTripped.MetricValues)
 			assert.Equal(t, tc.Metric.MetricCounts, roundTripped.MetricCounts)
 			assert.Equal(t, tc.Metric.MetricValueDouble, roundTripped.MetricValueDouble)
-			assert.Equal(t, tc.Metric.MetricValueInteger, roundTripped.MetricValueInteger)
+			assert.Equal(t, tc.Metric.MetricValueLong, roundTripped.MetricValueLong)
 			assert.Equal(t, tc.Metric.Unit, roundTripped.Unit)
 		})
 	}
@@ -405,22 +405,22 @@ func TestNilGeneralMetricsPayloadOmittedFromJSON(t *testing.T) {
 		Marshal    func() ([]byte, error)
 	}{
 		{
-			Name:       "TaskMetric with nil GeneralMetricsPayload",
-			StructType: "TaskMetric",
+			Name:       "ContainerMetric with nil GeneralMetricsPayload",
+			StructType: "ContainerMetric",
 			Marshal: func() ([]byte, error) {
-				tm := TaskMetric{
-					TaskArn:               aws.String("arn:aws:ecs:us-east-1:123456789012:task/test"),
+				cm := ContainerMetric{
+					ContainerName:         aws.String("test-container"),
 					GeneralMetricsPayload: nil,
 				}
-				return json.Marshal(&tm)
+				return json.Marshal(&cm)
 			},
 		},
 		{
-			Name:       "TaskMetric with populated GeneralMetricsPayload",
-			StructType: "TaskMetric",
+			Name:       "ContainerMetric with populated GeneralMetricsPayload",
+			StructType: "ContainerMetric",
 			Marshal: func() ([]byte, error) {
-				tm := TaskMetric{
-					TaskArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task/test"),
+				cm := ContainerMetric{
+					ContainerName: aws.String("test-container"),
 					GeneralMetricsPayload: []*GeneralMetricsWrapper{
 						{
 							MetricType: aws.String("GPU"),
@@ -430,7 +430,7 @@ func TestNilGeneralMetricsPayloadOmittedFromJSON(t *testing.T) {
 						},
 					},
 				}
-				return json.Marshal(&tm)
+				return json.Marshal(&cm)
 			},
 		},
 		{
@@ -454,7 +454,7 @@ func TestNilGeneralMetricsPayloadOmittedFromJSON(t *testing.T) {
 						{
 							MetricType: aws.String("GPU"),
 							GeneralMetrics: []*GeneralMetric{
-								{MetricName: aws.String("GPULimit"), MetricValueInteger: aws.Int64(4), Unit: aws.String("Count")},
+								{MetricName: aws.String("GPULimit"), MetricValueLong: aws.Int64(4), Unit: aws.String("Count")},
 							},
 						},
 					},
@@ -476,7 +476,7 @@ func TestNilGeneralMetricsPayloadOmittedFromJSON(t *testing.T) {
 			require.NoError(t, err)
 
 			_, hasKey := raw["generalMetricsPayload"]
-			if tc.Name == "TaskMetric with nil GeneralMetricsPayload" || tc.Name == "InstanceMetrics with nil GeneralMetricsPayload" {
+			if tc.Name == "ContainerMetric with nil GeneralMetricsPayload" || tc.Name == "InstanceMetrics with nil GeneralMetricsPayload" {
 				assert.False(t, hasKey, "generalMetricsPayload should be omitted when nil, got: %s", jsonString)
 			} else {
 				assert.True(t, hasKey, "generalMetricsPayload should be present when populated, got: %s", jsonString)
@@ -485,9 +485,9 @@ func TestNilGeneralMetricsPayloadOmittedFromJSON(t *testing.T) {
 	}
 }
 
-// Feature: tacs-payload-gpu-metrics, Property 3: TaskMetric Validate passes with GeneralMetricsPayload.
+// Feature: tacs-payload-gpu-metrics, Property 3: ContainerMetric Validate passes with GeneralMetricsPayload.
 // Validates: Requirements 2.4
-func TestTaskMetricValidateWithGeneralMetricsPayload(t *testing.T) {
+func TestContainerMetricValidateWithGeneralMetricsPayload(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		Name                  string
@@ -520,7 +520,7 @@ func TestTaskMetricValidateWithGeneralMetricsPayload(t *testing.T) {
 					Dimensions: []*Dimension{{Key: aws.String("GpuDevice"), Value: aws.String("0")}},
 					GeneralMetrics: []*GeneralMetric{
 						{MetricName: aws.String("GPUUtilization"), MetricValueDouble: aws.Float64(45.0), Unit: aws.String("Percent")},
-						{MetricName: aws.String("GPUMemoryUsed"), MetricValueInteger: aws.Int64(4096), Unit: aws.String("Megabytes")},
+						{MetricName: aws.String("GPUMemoryUsed"), MetricValueLong: aws.Int64(4096), Unit: aws.String("Megabytes")},
 					},
 				},
 				{
@@ -546,11 +546,11 @@ func TestTaskMetricValidateWithGeneralMetricsPayload(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()
-			tm := TaskMetric{
-				TaskArn:               aws.String("arn:aws:ecs:us-east-1:123456789012:task/test"),
+			cm := ContainerMetric{
+				ContainerName:         aws.String("test-container"),
 				GeneralMetricsPayload: tc.GeneralMetricsPayload,
 			}
-			err := tm.Validate()
+			err := cm.Validate()
 			assert.NoError(t, err)
 		})
 	}

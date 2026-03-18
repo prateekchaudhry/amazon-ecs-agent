@@ -229,7 +229,8 @@
     "InstanceMetrics":{
       "type":"structure",
       "members":{
-        "storage":{"shape":"InstanceStorageMetrics"}
+        "storage":{"shape":"InstanceStorageMetrics"},
+        "generalMetricsPayload":{"shape":"GeneralMetricsPayload"}
       }
     },
     "InstanceStatus":{
@@ -258,8 +259,7 @@
       "type":"structure",
       "members":{
         "rootFilesystem":{"shape":"Percentage"},
-        "dataFilesystem":{"shape":"Percentage"},
-        "generalMetricsPayload":{"shape":"GeneralMetricsPayload"}
+        "dataFilesystem":{"shape":"Percentage"}
       }
     },
     "InvalidParameterException":{
