@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -1397,6 +1398,39 @@ func (engine *DockerTaskEngine) pullContainerManifest(
 				field.ImageMediaType: imageManifestMediaType,
 				field.Image:          container.Image,
 			})
+
+			// Platform compatibility check: compare image platform(s) against host.
+			if len(distInspect.Platforms) > 0 {
+				hostOs := runtime.GOOS
+				hostArch := runtime.GOARCH
+				compatible := false
+				for _, p := range distInspect.Platforms {
+					if p.OS == hostOs && p.Architecture == hostArch {
+						compatible = true
+						break
+					}
+				}
+				if !compatible {
+					logger.Error("Image platform does not match host platform", logger.Fields{
+						field.TaskARN:       task.Arn,
+						field.ContainerName: container.Name,
+						field.Image:         container.Image,
+						"platforms":         distInspect.Platforms,
+						"hostOs":            hostOs,
+						"hostArch":          hostArch,
+					})
+					return dockerapi.DockerContainerMetadata{
+						Error: &dockerapi.ImagePlatformMismatchError{
+							Image:     container.Image,
+							ImageOs:   distInspect.Platforms[0].OS,
+							ImageArch: distInspect.Platforms[0].Architecture,
+							HostOs:    hostOs,
+							HostArch:  hostArch,
+						},
+					}
+				}
+			}
+
 			if imageManifestMediaType == mediaTypeManifestV1 || imageManifestMediaType == mediaTypeSignedManifestV1 {
 				logger.Info("skipping digest resolution for manifest v2 schema 1", logger.Fields{
 					field.TaskARN:        task.Arn,

@@ -921,6 +921,20 @@ func (mtask *managedTask) handleEventError(containerChange dockerContainerChange
 	// event.Status is the desired container transition from container's known status
 	// (* -> event.Status)
 	case apicontainerstatus.ContainerManifestPulled, apicontainerstatus.ContainerPulled:
+		// If the error is a platform mismatch, stop the task immediately regardless
+		// of ImagePullBehavior. A cached wrong-architecture image will also crash at
+		// runtime, so proceeding is pointless.
+		if _, ok := event.Error.(*dockerapi.ImagePlatformMismatchError); ok {
+			logger.Error("Image platform mismatch; moving task to STOPPED", logger.Fields{
+				field.TaskID:    mtask.GetID(),
+				field.Image:     container.Image,
+				field.Container: container.Name,
+				field.Error:     event.Error,
+				field.Status:    event.Status.String(),
+			})
+			mtask.SetDesiredStatus(apitaskstatus.TaskStopped)
+			return false
+		}
 		// If the agent pull behavior is always or once, we receive the error because
 		// the image or manifest pull fails, the task should fail. If we don't fail task here,
 		// then the cached image will probably be used for creating container, and we

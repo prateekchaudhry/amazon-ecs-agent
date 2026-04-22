@@ -220,6 +220,50 @@ func TestHandleEventError(t *testing.T) {
 			ExpectedTaskDesiredStatusStopped: true,
 			ExpectedOK:                       false,
 		},
+		{
+			Name:        "Platform mismatch on manifest pull - default pull behavior stops task",
+			EventStatus: apicontainerstatus.ContainerManifestPulled,
+			Error: &dockerapi.ImagePlatformMismatchError{
+				Image: "myimage:latest", ImageOs: "linux", ImageArch: "arm64",
+				HostOs: "linux", HostArch: "amd64",
+			},
+			ImagePullBehavior:                config.ImagePullDefaultBehavior,
+			ExpectedTaskDesiredStatusStopped: true,
+			ExpectedOK:                       false,
+		},
+		{
+			Name:        "Platform mismatch on manifest pull - always pull behavior stops task",
+			EventStatus: apicontainerstatus.ContainerManifestPulled,
+			Error: &dockerapi.ImagePlatformMismatchError{
+				Image: "myimage:latest", ImageOs: "linux", ImageArch: "arm64",
+				HostOs: "linux", HostArch: "amd64",
+			},
+			ImagePullBehavior:                config.ImagePullAlwaysBehavior,
+			ExpectedTaskDesiredStatusStopped: true,
+			ExpectedOK:                       false,
+		},
+		{
+			Name:        "Platform mismatch on manifest pull - once pull behavior stops task",
+			EventStatus: apicontainerstatus.ContainerManifestPulled,
+			Error: &dockerapi.ImagePlatformMismatchError{
+				Image: "myimage:latest", ImageOs: "linux", ImageArch: "arm64",
+				HostOs: "linux", HostArch: "amd64",
+			},
+			ImagePullBehavior:                config.ImagePullOnceBehavior,
+			ExpectedTaskDesiredStatusStopped: true,
+			ExpectedOK:                       false,
+		},
+		{
+			Name:        "Platform mismatch on manifest pull - prefer-cached pull behavior stops task",
+			EventStatus: apicontainerstatus.ContainerManifestPulled,
+			Error: &dockerapi.ImagePlatformMismatchError{
+				Image: "myimage:latest", ImageOs: "linux", ImageArch: "arm64",
+				HostOs: "linux", HostArch: "amd64",
+			},
+			ImagePullBehavior:                config.ImagePullPreferCachedBehavior,
+			ExpectedTaskDesiredStatusStopped: true,
+			ExpectedOK:                       false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -264,6 +308,10 @@ func TestHandleEventError(t *testing.T) {
 				containerDesiredStatus := containerChange.container.GetDesiredStatus()
 				assert.Equal(t, apicontainerstatus.ContainerStopped, containerDesiredStatus,
 					"desired status %s != %s", apicontainerstatus.ContainerStopped.String(), containerDesiredStatus.String())
+			}
+			if tc.ExpectedTaskDesiredStatusStopped {
+				assert.Equal(t, apitaskstatus.TaskStopped, mtask.GetDesiredStatus(),
+					"expected task desired status to be STOPPED")
 			}
 			assert.Equal(t, tc.Error.ErrorName(), containerChange.container.ApplyingError.ErrorName())
 		})

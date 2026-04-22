@@ -19,8 +19,10 @@ package dockerapi
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
+	apierrors "github.com/aws/amazon-ecs-agent/ecs-agent/api/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -93,4 +95,33 @@ func TestRedactEcrUrls(t *testing.T) {
 		redactedErr := redactEcrUrls(tc.overrideStr, tc.err)
 		assert.Equal(t, redactedErr.Error(), tc.expectedErr.Error(), "ECR URL redaction output mismatch")
 	}
+}
+
+func TestImagePlatformMismatchError_Error(t *testing.T) {
+	err := ImagePlatformMismatchError{
+		Image:     "123456789.dkr.ecr.us-east-1.amazonaws.com/myapp:latest",
+		ImageOs:   "linux",
+		ImageArch: "arm64",
+		HostOs:    "linux",
+		HostArch:  "amd64",
+	}
+	msg := err.Error()
+	assert.True(t, strings.Contains(msg, "123456789.dkr.ecr.us-east-1.amazonaws.com/myapp:latest"))
+	assert.True(t, strings.Contains(msg, "linux/arm64"))
+	assert.True(t, strings.Contains(msg, "linux/amd64"))
+	assert.True(t, strings.Contains(msg, "Build the image for the correct platform or use a multi-platform image"))
+}
+
+func TestImagePlatformMismatchError_ErrorName(t *testing.T) {
+	err := ImagePlatformMismatchError{}
+	assert.Equal(t, "ImagePlatformMismatchError", err.ErrorName())
+}
+
+func TestImagePlatformMismatchError_Retry(t *testing.T) {
+	err := ImagePlatformMismatchError{}
+	assert.False(t, err.Retry())
+}
+
+func TestImagePlatformMismatchError_ImplementsNamedError(t *testing.T) {
+	var _ apierrors.NamedError = ImagePlatformMismatchError{}
 }

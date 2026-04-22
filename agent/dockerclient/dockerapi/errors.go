@@ -433,6 +433,34 @@ func (err CannotInspectContainerExecError) ErrorName() string {
 	return "CannotInspectContainerExecError"
 }
 
+// ImagePlatformMismatchError indicates that the container image's platform
+// (OS/architecture) does not match the host's platform.
+type ImagePlatformMismatchError struct {
+	Image     string
+	ImageOs   string
+	ImageArch string
+	HostOs    string
+	HostArch  string
+}
+
+func (err ImagePlatformMismatchError) Error() string {
+	return fmt.Sprintf(
+		"Image %s is built for %s/%s but this host is %s/%s. "+
+			"Build the image for the correct platform or use a multi-platform image.",
+		err.Image, err.ImageOs, err.ImageArch, err.HostOs, err.HostArch,
+	)
+}
+
+// ErrorName returns the name of the ImagePlatformMismatchError.
+func (err ImagePlatformMismatchError) ErrorName() string {
+	return "ImagePlatformMismatchError"
+}
+
+// Retry returns false because retrying cannot change the image's architecture.
+func (err ImagePlatformMismatchError) Retry() bool {
+	return false
+}
+
 // Redact ECR bucket urls from error string
 // Return a new error with redacted string - replacing ECR bucket (*starport-layer-bucket*) urls with a string.
 // This is done because container runtime's request may sometimes contain security tokens when accessing ECR buckets for image layers.

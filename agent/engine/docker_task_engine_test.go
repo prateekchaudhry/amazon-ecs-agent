@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -4513,6 +4514,106 @@ func TestPullContainerManifest(t *testing.T) {
 				expectedDigest: testDigest.String(),
 			}
 		}(),
+		{
+			name:              "image pull required - platform match passes",
+			image:             "myimage",
+			imagePullBehavior: config.ImagePullAlwaysBehavior,
+			setDockerClientExpectations: func(c *gomock.Controller, d *mock_dockerapi.MockDockerClient) {
+				versioned := mock_dockerapi.NewMockDockerClient(c)
+				versioned.EXPECT().
+					PullImageManifest(gomock.Any(), "myimage", nil).
+					Return(
+						registry.DistributionInspect{
+							Descriptor: ocispec.Descriptor{
+								MediaType: mediaTypeManifestV2,
+								Digest:    testDigest,
+							},
+							Platforms: []ocispec.Platform{
+								{OS: runtime.GOOS, Architecture: runtime.GOARCH},
+							},
+						},
+						nil)
+				d.EXPECT().WithVersion(dockerclient.Version_1_35).Return(versioned, nil)
+			},
+			expectedDigest: testDigest.String(),
+		},
+		{
+			name:              "image pull required - platform mismatch returns error",
+			image:             "myimage",
+			imagePullBehavior: config.ImagePullAlwaysBehavior,
+			setDockerClientExpectations: func(c *gomock.Controller, d *mock_dockerapi.MockDockerClient) {
+				versioned := mock_dockerapi.NewMockDockerClient(c)
+				versioned.EXPECT().
+					PullImageManifest(gomock.Any(), "myimage", nil).
+					Return(
+						registry.DistributionInspect{
+							Descriptor: ocispec.Descriptor{
+								MediaType: mediaTypeManifestV2,
+								Digest:    testDigest,
+							},
+							Platforms: []ocispec.Platform{
+								{OS: "linux", Architecture: "s390x"},
+							},
+						},
+						nil)
+				d.EXPECT().WithVersion(dockerclient.Version_1_35).Return(versioned, nil)
+			},
+			expectedResult: dockerapi.DockerContainerMetadata{
+				Error: &dockerapi.ImagePlatformMismatchError{
+					Image:     "myimage",
+					ImageOs:   "linux",
+					ImageArch: "s390x",
+					HostOs:    runtime.GOOS,
+					HostArch:  runtime.GOARCH,
+				},
+			},
+		},
+		{
+			name:              "image pull required - empty platforms skips check",
+			image:             "myimage",
+			imagePullBehavior: config.ImagePullAlwaysBehavior,
+			setDockerClientExpectations: func(c *gomock.Controller, d *mock_dockerapi.MockDockerClient) {
+				versioned := mock_dockerapi.NewMockDockerClient(c)
+				versioned.EXPECT().
+					PullImageManifest(gomock.Any(), "myimage", nil).
+					Return(
+						registry.DistributionInspect{
+							Descriptor: ocispec.Descriptor{
+								MediaType: mediaTypeManifestV2,
+								Digest:    testDigest,
+							},
+							Platforms: []ocispec.Platform{},
+						},
+						nil)
+				d.EXPECT().WithVersion(dockerclient.Version_1_35).Return(versioned, nil)
+			},
+			expectedDigest: testDigest.String(),
+		},
+		{
+			name:              "image pull required - multi-platform with one match passes",
+			image:             "myimage",
+			imagePullBehavior: config.ImagePullAlwaysBehavior,
+			setDockerClientExpectations: func(c *gomock.Controller, d *mock_dockerapi.MockDockerClient) {
+				versioned := mock_dockerapi.NewMockDockerClient(c)
+				versioned.EXPECT().
+					PullImageManifest(gomock.Any(), "myimage", nil).
+					Return(
+						registry.DistributionInspect{
+							Descriptor: ocispec.Descriptor{
+								MediaType: mediaTypeManifestV2,
+								Digest:    testDigest,
+							},
+							Platforms: []ocispec.Platform{
+								{OS: "linux", Architecture: "s390x"},
+								{OS: runtime.GOOS, Architecture: runtime.GOARCH},
+								{OS: "windows", Architecture: "amd64"},
+							},
+						},
+						nil)
+				d.EXPECT().WithVersion(dockerclient.Version_1_35).Return(versioned, nil)
+			},
+			expectedDigest: testDigest.String(),
+		},
 	}
 
 	for _, tc := range tcs {
