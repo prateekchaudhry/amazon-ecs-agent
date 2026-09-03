@@ -19,7 +19,7 @@
 %global agent_image ecs-agent-v%{version}.tar
 
 Name:           amazon-ecs-init
-Version:        9.99.9
+Version:        9.99.8
 Release:        1
 License:        Apache 2.0
 Summary:        Amazon Elastic Container Service initialization application
