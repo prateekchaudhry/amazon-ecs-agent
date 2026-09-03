@@ -1,5 +1,11 @@
 # Changelog
 
+# 9.99.9
+* Enhancement - Enhancement - Attach the MPS control daemon health gate to MPS tasks [#5119](https://github.com/aws/amazon-ecs-agent/pull/5119)
+* Enhancement - Bump k8s.io/api from 0.28.1 to 0.37.0 in /agent [#5118](https://github.com/aws/amazon-ecs-agent/pull/5118)
+* Enhancement - Add MPS control daemon health gate task resource [#5107](https://github.com/aws/amazon-ecs-agent/pull/5107)
+* Enhancement - Grant CloudWatch Logs export permission on the release artifacts bucket [#5116](https://github.com/aws/amazon-ecs-agent/pull/5116)
+
 # 1.106.2
 * Enhancement - Bump golang.org/x/text and related dependencies [#5100](https://github.com/aws/amazon-ecs-agent/pull/5100)
 * Enhancement - Bump github.com/aws/aws-sdk-go-v2/feature/ec2/imds from 1.18.33 to 1.18.38 in /ecs-agent [#5093](https://github.com/aws/amazon-ecs-agent/pull/5093)
