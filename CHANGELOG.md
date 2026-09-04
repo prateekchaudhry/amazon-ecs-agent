@@ -1,6 +1,7 @@
 # Changelog
 
 # 9.99.10
+* Enhancement - Simplify auto-merge-and-tag and guard against non-merge-commit merges
 
 # 9.99.9
 * Enhancement - Enhancement - Attach the MPS control daemon health gate to MPS tasks [#5119](https://github.com/aws/amazon-ecs-agent/pull/5119)
