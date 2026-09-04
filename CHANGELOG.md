@@ -1,5 +1,7 @@
 # Changelog
 
+# 9.99.7
+
 # 9.99.8
 * Test - negative test case: wrong PR author for auto-merge-and-tag
 
