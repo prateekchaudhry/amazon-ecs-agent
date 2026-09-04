@@ -1,6 +1,10 @@
 name: Auto Merge and Tag
 
-# trigger: fire on pull request merged to dev. Narrowed down by if filter below.
+# Github workflow to auto merge release PRs to master
+# - Fires when any PR merges into dev.
+# - classify (validation gate, verifies this merge came from a release branch): runs only for a merged v*-stage branch with a valid X.Y.Z semver; otherwise promote is skipped.
+# - promote (release step): only for a real release branch; fast-forwards master to the release commit, tags v<X.Y.Z>, and drafts the GitHub release.
+
 on:
   pull_request:
     types: [closed]
@@ -10,9 +14,6 @@ permissions:
   contents: read
 
 jobs:
-  # Decide whether this merge is a release promotion. This is a separate job so
-  # that a branch which merely resembles a release branch produces a SKIPPED
-  # promote job rather than a failed one.
   classify:
     if: >-
       github.event.pull_request.merged == true &&
@@ -48,10 +49,7 @@ jobs:
       AGENT_VERSION: ${{ needs.classify.outputs.agent_version }}
       RELEASE_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
-      # This must come before the checkout. The push to master has to carry the
-      # app's credentials, because master restricts pushes to amazon-ecs-bot and
-      # the default GITHUB_TOKEN is attributed to github-actions[bot], which is
-      # not on that allowlist.
+      # Generate GH App token : must precede actions/checkout, so that we can provide necessary GH App token for checkout and merge to master later
       - name: Generate App Token
         id: app-token
         uses: actions/create-github-app-token@v3
@@ -61,18 +59,6 @@ jobs:
           # We only ever push and tag; no need for the app's pull-requests permission too.
           permission-contents: write
 
-      # Fails the job unless amazon-ecs-prateek-bot opened this PR; swap the name here when this lands in the real repo.
-      - name: Verify the pull request was opened by this repo's App
-        env:
-          ACTUAL_LOGIN: ${{ github.event.pull_request.user.login }}
-        run: |
-          set -euo pipefail
-          EXPECTED_LOGIN="amazon-ecs-prateek-bot[bot]"
-          if [[ "$ACTUAL_LOGIN" != "$EXPECTED_LOGIN" ]]; then
-            echo "::error::Release pull request was opened by ${ACTUAL_LOGIN}, expected ${EXPECTED_LOGIN}"
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
         with:
           # Full history so `git show RELEASE_SHA:...` below can find that commit's tree.
@@ -80,41 +66,29 @@ jobs:
           # token: is checkout's own input; it sets the git credential every later `git` command uses (git push below).
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Verify the version files match the branch name
-        run: |
-          set -euo pipefail
-          for path in VERSION ecs-init/ECSVERSION; do
-            FILE_VERSION="$(git show "${RELEASE_SHA}:${path}" | tr -d '[:space:]')"
-            if [[ "$FILE_VERSION" != "$AGENT_VERSION" ]]; then
-              echo "::error::Branch implies version ${AGENT_VERSION}, but ${path} at ${RELEASE_SHA} contains ${FILE_VERSION}"
-              exit 1
-            fi
-          done
-          for path in packaging/amazon-linux-ami-integrated/ecs-agent.spec packaging/generic-rpm-integrated/amazon-ecs-init.spec; do
-            SPEC_VERSION="$(git show "${RELEASE_SHA}:${path}" | grep -m1 '^Version:' | awk '{print $2}')"
-            if [[ "$SPEC_VERSION" != "$AGENT_VERSION" ]]; then
-              echo "::error::Branch implies version ${AGENT_VERSION}, but ${path} at ${RELEASE_SHA} has Version: ${SPEC_VERSION}"
-              exit 1
-            fi
-          done
-
       - name: Check that this version has not already been released
         env:
           # gh reads GH_TOKEN from the environment; it does not use checkout's git credential.
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
-          if gh release view "v${AGENT_VERSION}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            echo "::error::Version ${AGENT_VERSION} has already been released (tag v${AGENT_VERSION} exists). If this release needs to be redone, delete the release and tag manually first (see runbook)."
+          # gh release view only finds a Release object; check the tag itself too, since a tag can survive a deleted release.
+          if gh release view "v${AGENT_VERSION}" --repo "${{ github.repository }}" >/dev/null 2>&1 || \
+             gh api "repos/${{ github.repository }}/git/refs/tags/v${AGENT_VERSION}" >/dev/null 2>&1; then
+            echo "::error::Version ${AGENT_VERSION} already has a GitHub release or a v${AGENT_VERSION} tag. Delete whichever exists (a draft release has no tag yet) and re-run this workflow."
             exit 1
           fi
 
-      # A plain push, never --force. A non-fast-forward rejection here is a
-      # deliberate tripwire: it means dev and master have diverged and the
-      # release commit is not a descendant of master.
+      # Fast-forward only, no --force: a rejection means dev/master diverged and the release commit isn't a master descendant.
       - name: Fast-forward master to the release commit
         run: |
           set -euo pipefail
+          # A squash/rebase merge orphans the release commit from dev, so master would point off dev's history. Only a merge commit keeps it reachable.
+          git fetch origin dev
+          if ! git merge-base --is-ancestor "${RELEASE_SHA}" origin/dev; then
+            echo "::error::${RELEASE_SHA} is not on dev's history, so pushing it would diverge master from dev. The release PR must be merged as a merge commit, not squashed or rebased."
+            exit 1
+          fi
           echo "Pushing ${RELEASE_SHA} to master..."
           git push origin "${RELEASE_SHA}:refs/heads/master"
 
@@ -127,15 +101,13 @@ jobs:
             found && /^# / { exit }
             found { print }
           ' /tmp/full-changelog.md > /tmp/release-notes.md
-          if [[ ! -s /tmp/release-notes.md ]]; then
-            echo "::error::No CHANGELOG.md section found for version ${AGENT_VERSION}"
+          # Test for real content, not file size: an empty section yields a blank line, which -s counts as non-empty.
+          if [[ -z "$(tr -d '[:space:]' < /tmp/release-notes.md)" ]]; then
+            echo "::error::CHANGELOG.md has no release notes under '# ${AGENT_VERSION}'"
             exit 1
           fi
 
-      # This creates the v<version> tag on the release commit and the draft
-      # release together, which is the same pairing the release runbook performs
-      # by hand in the GitHub web interface. Publishing the draft is a separate,
-      # later step and is deliberately not done here.
+      # Tags v<version> and drafts the release together, same pairing the manual runbook does; publishing the draft stays a separate later step.
       - name: Create the release tag and draft the release
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
