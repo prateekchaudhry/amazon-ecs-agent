@@ -395,9 +395,6 @@ fi
 %endif
 
 %changelog
-* Fri Sep 04 2026 amazon-ecs-bot <amazon-ecs-bot@amazon.com> - 9.99.7-1
-- Cache Agent version 9.99.7
-
 * Thu Sep 03 2026 amazon-ecs-bot <amazon-ecs-bot@amazon.com> - 9.99.9-1
 - Cache Agent version 9.99.9
 

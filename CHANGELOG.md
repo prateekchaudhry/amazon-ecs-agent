@@ -1,10 +1,5 @@
 # Changelog
 
-# 9.99.7
-
-# 9.99.8
-* Test - negative test case: wrong PR author for auto-merge-and-tag
-
 # 9.99.9
 * Enhancement - Enhancement - Attach the MPS control daemon health gate to MPS tasks [#5119](https://github.com/aws/amazon-ecs-agent/pull/5119)
 * Enhancement - Bump k8s.io/api from 0.28.1 to 0.37.0 in /agent [#5118](https://github.com/aws/amazon-ecs-agent/pull/5118)
