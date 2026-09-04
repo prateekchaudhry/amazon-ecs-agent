@@ -1,6 +1,7 @@
 # Changelog
 
 # 9.99.10
+* Test - happy path re-test for the simplified auto-merge-and-tag workflow
 
 # 9.99.7
 
