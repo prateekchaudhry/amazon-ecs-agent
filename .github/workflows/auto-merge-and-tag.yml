@@ -1,9 +1,9 @@
 name: Auto Merge and Tag
 
-# Github workflow to auto merge release PRs to master
+# GitHub workflow to auto merge release PRs to master
 # - Fires when any PR merges into dev.
 # - classify (validation gate, verifies this merge came from a release branch): runs only for a merged v*-stage branch with a valid X.Y.Z semver; otherwise promote is skipped.
-# - promote (release step): only for a real release branch; fast-forwards master to the release commit, tags v<X.Y.Z>, and drafts the GitHub release.
+# - promote (release step): only for a real release branch; fast-forwards master to the release commit and drafts release v<X.Y.Z>. Publishing that draft is what creates the tag.
 
 on:
   pull_request:
@@ -37,7 +37,7 @@ jobs:
             echo "is_release=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "Recognised release version ${AGENT_VERSION}"
+          echo "Recognized release version ${AGENT_VERSION}"
           echo "is_release=true" >> "$GITHUB_OUTPUT"
           echo "agent_version=${AGENT_VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -56,7 +56,7 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          # We only ever push and tag; no need for the app's pull-requests permission too.
+          # We only ever push and create a release; no need for the app's pull-requests permission too.
           permission-contents: write
 
       - uses: actions/checkout@v7
@@ -79,19 +79,7 @@ jobs:
             exit 1
           fi
 
-      # Fast-forward only, no --force: a rejection means dev/master diverged and the release commit isn't a master descendant.
-      - name: Fast-forward master to the release commit
-        run: |
-          set -euo pipefail
-          # A squash/rebase merge orphans the release commit from dev, so master would point off dev's history. Only a merge commit keeps it reachable.
-          git fetch origin dev
-          if ! git merge-base --is-ancestor "${RELEASE_SHA}" origin/dev; then
-            echo "::error::${RELEASE_SHA} is not on dev's history, so pushing it would diverge master from dev. The release PR must be merged as a merge commit, not squashed or rebased."
-            exit 1
-          fi
-          echo "Pushing ${RELEASE_SHA} to master..."
-          git push origin "${RELEASE_SHA}:refs/heads/master"
-
+      # Runs before the master push so a missing changelog section fails with master untouched.
       - name: Extract the changelog section for this version
         run: |
           set -euo pipefail
@@ -107,8 +95,21 @@ jobs:
             exit 1
           fi
 
-      # Tags v<version> and drafts the release together, same pairing the manual runbook does; publishing the draft stays a separate later step.
-      - name: Create the release tag and draft the release
+      # Fast-forward only, no --force: a rejection means dev/master diverged and the release commit isn't a master descendant.
+      - name: Fast-forward master to the release commit
+        run: |
+          set -euo pipefail
+          # A squash/rebase merge orphans the release commit from dev, so master would point off dev's history. Only a merge commit keeps it reachable.
+          git fetch origin dev
+          if ! git merge-base --is-ancestor "${RELEASE_SHA}" origin/dev; then
+            echo "::error::${RELEASE_SHA} is not on dev's history, so pushing it would diverge master from dev. The release PR must be merged as a merge commit, not squashed or rebased."
+            exit 1
+          fi
+          echo "Pushing ${RELEASE_SHA} to master..."
+          git push origin "${RELEASE_SHA}:refs/heads/master"
+
+      # Drafts the release the manual runbook would cut by hand. The v<version> tag ref appears only when someone publishes the draft.
+      - name: Draft the release for this version
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
