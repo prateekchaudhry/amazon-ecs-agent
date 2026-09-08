@@ -1,8 +1,5 @@
 # Changelog
 
-# 9.100.1
-* Enhancement - T1 fixture: exercise the merge-commit ancestor guard
-
 # 9.99.10
 * Enhancement - Simplify auto-merge-and-tag and guard against non-merge-commit merges
 
