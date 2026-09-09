@@ -1,6 +1,7 @@
 # Changelog
 
 # 9.100.2
+* Enhancement - Happy-path fixture: verify promote completes against the reordered workflow
 
 # 9.99.10
 * Enhancement - Simplify auto-merge-and-tag and guard against non-merge-commit merges
