@@ -1,5 +1,7 @@
 # Changelog
 
+# 9.100.4
+
 # 9.99.10
 * Enhancement - Simplify auto-merge-and-tag and guard against non-merge-commit merges
 
