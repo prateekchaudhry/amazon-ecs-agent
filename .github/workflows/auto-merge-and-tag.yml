@@ -75,7 +75,7 @@ jobs:
           # gh release view only finds a Release object; check the tag itself too, since a tag can survive a deleted release.
           if gh release view "v${AGENT_VERSION}" --repo "${{ github.repository }}" >/dev/null 2>&1 || \
              gh api "repos/${{ github.repository }}/git/refs/tags/v${AGENT_VERSION}" >/dev/null 2>&1; then
-            echo "::error::Version ${AGENT_VERSION} already has a GitHub release or a v${AGENT_VERSION} tag. Delete whichever exists (a draft release has no tag yet) and re-run this workflow."
+            echo "::error::Version ${AGENT_VERSION} already has a GitHub release or a v${AGENT_VERSION} tag. If it is an unpublished draft, delete it and re-run this workflow. IMPORTANT: DO NOT delete a previously completed release or tag"
             exit 1
           fi
 
