@@ -2,7 +2,7 @@ name: Auto Merge and Tag
 
 # GitHub workflow to auto merge release PRs to master
 # - Fires when any PR merges into dev.
-# - classify (validation gate, verifies this merge came from a release branch): runs only for a merged v*-stage branch with a valid X.Y.Z semver; otherwise promote is skipped.
+# - classify (validation gate, verifies this merge came from a release branch): runs only for a merged v*-stage branch with a valid X.Y.Z semver, and fails if that PR was not opened by the release bot; otherwise promote is skipped.
 # - promote (release step): only for a real release branch; fast-forwards master to the release commit and drafts release v<X.Y.Z>. Publishing that draft is what creates the tag.
 
 on:
@@ -28,6 +28,9 @@ jobs:
         id: check
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          # create-release-pr opens the release PR with its GitHub App token, so the App's bot user is the author.
+          EXPECTED_AUTHOR: amazon-ecs-bot[bot]
         run: |
           set -euo pipefail
           AGENT_VERSION="${HEAD_REF#v}"
@@ -36,6 +39,10 @@ jobs:
             echo "::notice::Branch '${HEAD_REF}' does not name an X.Y.Z release. Nothing to promote."
             echo "is_release=false" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+          if [[ "$PR_AUTHOR" != "$EXPECTED_AUTHOR" ]]; then
+            echo "::error::Release PR for ${AGENT_VERSION} was authored by ${PR_AUTHOR}, not ${EXPECTED_AUTHOR}. Only a release PR opened by create-release-pr is promoted automatically. Promote master by hand for a manually staged release."
+            exit 1
           fi
           echo "Recognized release version ${AGENT_VERSION}"
           echo "is_release=true" >> "$GITHUB_OUTPUT"
