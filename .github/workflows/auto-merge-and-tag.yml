@@ -41,7 +41,7 @@ jobs:
             exit 0
           fi
           if [[ "$PR_AUTHOR" != "$EXPECTED_AUTHOR" ]]; then
-            echo "::error::Release PR for ${AGENT_VERSION} was authored by ${PR_AUTHOR}, not ${EXPECTED_AUTHOR}. Only a release PR opened by create-release-pr is promoted automatically. Promote master by hand for a manually staged release."
+            echo "::error::Release PR for ${AGENT_VERSION} was authored by ${PR_AUTHOR}, not ${EXPECTED_AUTHOR}. Only a release PR opened by the create-release-pr workflow and authored by amazon-ecs-bot is promoted automatically."
             exit 1
           fi
           echo "Recognized release version ${AGENT_VERSION}"
