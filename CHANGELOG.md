@@ -1,5 +1,8 @@
 # Changelog
 
+# 9.100.7
+* Enhancement - Test entry for the auto-merge-and-tag end-to-end run
+
 # 9.99.10
 * Enhancement - Simplify auto-merge-and-tag and guard against non-merge-commit merges
 
