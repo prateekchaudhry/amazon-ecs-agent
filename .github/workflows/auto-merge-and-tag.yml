@@ -30,7 +30,7 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           # create-release-pr opens the release PR with its GitHub App token, so the App's bot user is the author.
-          EXPECTED_AUTHOR: amazon-ecs-prateek-bot[bot]
+          EXPECTED_AUTHOR: amazon-ecs-bot[bot]
         run: |
           set -euo pipefail
           AGENT_VERSION="${HEAD_REF#v}"
